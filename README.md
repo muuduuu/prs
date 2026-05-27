@@ -1,24 +1,34 @@
 # PRS Mobile Pentest Agent
 
-PRS is a local, API-driven ReAct orchestrator for authorized Android application assessment. It coordinates a Bifrost LLM gateway with controlled tool wrappers for device checks, APK metadata extraction, decompilation, MobSF upload, and runtime readiness checks.
+PRS is a local, API-driven ReAct orchestrator for authorized Android application assessment. It coordinates a Bifrost LLM gateway with controlled tool wrappers for device checks, APK metadata extraction, decompilation, MobSF upload, finding normalization, and bounded exploitability validation.
 
 ## Current Capabilities
 
 - Local web dashboard for APK upload, Bifrost setup, model selection, MobSF config, live trace viewing, and final report output.
 - Bifrost model discovery from an OpenAI-compatible `/models` endpoint.
-- Bifrost crew mode: when the gateway is enabled, PRS runs specialist lanes for static reversing, MobSF triage, dynamic/device checks, and report synthesis.
+- Bifrost crew mode: when the gateway is enabled, PRS runs specialist lanes for static reversing, MobSF triage, dynamic/device checks, secrets/WebView review, exploitability validation, and report synthesis.
 - Deterministic no-key planner for local smoke tests.
 - Tool registry with allow-listed wrappers for:
   - `adb`: devices, version, third-party package listing.
-  - `aapt`: APK package metadata and manifest badging.
+  - `apk_metadata`: APK package metadata via `pyaxmlparser`, with `aapt` fallback when available.
+  - `manifest_findings`: manifest risk findings for debug flags, backups, cleartext, exported components, permissions, SDK levels, and network security config.
   - `apktool`: resources and smali decompilation.
   - `jadx`: Java/Kotlin-like source decompilation.
+  - `secret_scan`: decompiled source scanner with redacted secret evidence.
+  - `webview_audit`: risky WebView/JavaScript bridge configuration scanner.
   - `frida`: CLI readiness and USB process listing.
+  - `emulator`: AVD list/boot/wait/install/launch/uninstall/device-state helper.
+  - `frida_probe`: bounded runtime probes for SSL pinning, root detection, and crypto observations.
+  - `intent_fuzzer`: bounded exported-component probing on an authorized connected device or emulator.
+  - `backup_audit`: controlled `adb backup` confirmation for allowBackup risk.
   - `mobsf_submit` / `mobsf_poll`: asynchronous MobSF analysis lane.
   - `mobsf_scan`: synchronous MobSF fallback for direct scans.
+  - `mobsf_findings`: MobSF JSON report parser into the unified findings shape.
+  - `finding_compile` / `exploit_verify`: consolidated report and confirmed/unverified validation table.
 - JSONL and final JSON traces in `runs/<run_id>/logs/` for later SFT dataset conversion.
 - Reverse-analysis subagent scaffold exposed through `reverse_analysis_plan` for
-  static reverse, dynamic/device checks, MobSF triage, and report synthesis.
+  static reverse, dynamic/device checks, MobSF triage, secrets/WebView review,
+  exploitability validation, and report synthesis.
 
 ## Run Locally
 

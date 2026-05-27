@@ -37,7 +37,7 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
         identifier="static_reverse",
         name="Static Reverse Analyst",
         mission="Own fast APK reversing while slow scanner lanes run in parallel.",
-        tool_focus=("apk_metadata", "apktool_decompile", "jadx_decompile"),
+        tool_focus=("apk_metadata", "manifest_findings", "apktool_decompile", "jadx_decompile"),
         workflow=(
             "Identify package name, version, SDK targets, permissions, and exported components.",
             "Review manifests, resources, network security config, and deep link declarations.",
@@ -53,10 +53,29 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
         ),
     ),
     SubagentRole(
+        identifier="secret_webview",
+        name="Secrets and WebView Analyst",
+        mission="Turn decompiled artifacts into focused findings for embedded secrets and unsafe WebView behavior.",
+        tool_focus=("secret_scan", "webview_audit"),
+        workflow=(
+            "Wait for or consume JADX/apktool output directories produced by the static reverse lane.",
+            "Scan code, resources, smali, and configuration files for credential-shaped literals and sensitive endpoints.",
+            "Audit WebView settings, JavaScript bridges, file access, SSL-error handling, mixed content, and debugging toggles.",
+            "Emit normalized findings with file paths, line numbers, redacted snippets, and confidence notes.",
+        ),
+        inputs=("jadx artifacts", "apktool artifacts", "artifact conventions"),
+        outputs=("secret findings", "WebView findings", "source evidence references"),
+        guardrails=(
+            "Redact secrets in observations and reports.",
+            "Do not exfiltrate or validate third-party credentials.",
+            "Treat regex matches as candidates until reviewed or corroborated.",
+        ),
+    ),
+    SubagentRole(
         identifier="dynamic_device",
         name="Dynamic Device Analyst",
         mission="Coordinate device-readiness checks and bounded runtime observations on authorized devices.",
-        tool_focus=("adb", "frida"),
+        tool_focus=("adb", "frida", "emulator", "frida_probe"),
         workflow=(
             "Confirm device visibility, Android version, target package install state, and Frida readiness.",
             "Capture bounded process/package observations without changing app state unexpectedly.",
@@ -87,6 +106,26 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
         guardrails=(
             "Treat scanner severity as advisory until corroborated.",
             "Keep MobSF credentials and service configuration outside model context.",
+        ),
+    ),
+    SubagentRole(
+        identifier="exploitability_validation",
+        name="Exploitability Validation Analyst",
+        mission="Confirm whether high-risk findings are practically reachable using bounded, authorized probes.",
+        tool_focus=("finding_compile", "exploit_verify", "intent_fuzzer", "backup_audit", "frida_probe"),
+        workflow=(
+            "Compile normalized findings from static, scanner, and runtime lanes.",
+            "Prioritize high-severity items that have safe confirmation methods.",
+            "Use bounded runtime probes only on connected devices or emulators owned by the tester.",
+            "Separate confirmed findings from unverified hypotheses and blocked checks.",
+            "Record verification artifacts and commands through tool results, not free-form shell output.",
+        ),
+        inputs=("manifest findings", "secret findings", "WebView findings", "MobSF findings", "package name", "device readiness"),
+        outputs=("compiled findings report", "verification table", "confirmed exploitability evidence", "blocked checks"),
+        guardrails=(
+            "Do not generate weaponized payloads, persistence, stealth, or data theft workflows.",
+            "Keep probes bounded, reversible, and scoped to the provided package.",
+            "If authorization, package identity, or device state is unclear, mark the check blocked.",
         ),
     ),
     SubagentRole(
@@ -154,9 +193,9 @@ def build_reverse_analysis_plan(
         "handoffs": [
             {
                 "from": "static_reverse",
-                "to": "dynamic_device",
-                "payload": "package name, exported surfaces, and hypotheses needing runtime validation",
-                "enabled": include_dynamic,
+                "to": "secret_webview",
+                "payload": "jadx/apktool output paths for source-level secret and WebView analysis",
+                "enabled": True,
             },
             {
                 "from": "static_reverse",
@@ -166,20 +205,26 @@ def build_reverse_analysis_plan(
             },
             {
                 "from": "dynamic_device",
-                "to": "report_synthesis",
+                "to": "exploitability_validation",
                 "payload": "device readiness, runtime observations, and blocked checks",
                 "enabled": include_dynamic,
             },
             {
                 "from": "mobsf_triage",
-                "to": "report_synthesis",
+                "to": "exploitability_validation",
                 "payload": "normalized scanner findings and verification queue",
                 "enabled": include_mobsf,
             },
             {
-                "from": "static_reverse",
+                "from": "secret_webview",
+                "to": "exploitability_validation",
+                "payload": "secret and WebView findings requiring confirmation or manual review",
+                "enabled": True,
+            },
+            {
+                "from": "exploitability_validation",
                 "to": "report_synthesis",
-                "payload": "candidate static findings and artifact index",
+                "payload": "compiled findings, verification table, and confirmed evidence",
                 "enabled": True,
             },
         ],

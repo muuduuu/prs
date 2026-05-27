@@ -9,12 +9,19 @@ arguments.
 ## Roles
 
 - `static_reverse`: inspects APK metadata, manifests, resources, and decompiled
-  code using `apk_metadata`, `apktool_decompile`, and `jadx_decompile`.
+  code using `apk_metadata`, `manifest_findings`, `apktool_decompile`, and
+  `jadx_decompile`.
+- `secret_webview`: consumes decompiled source directories and emits focused
+  findings from `secret_scan` and `webview_audit` with redacted evidence.
 - `dynamic_device`: checks authorized device readiness and bounded runtime
-  observations through `adb` and `frida`.
+  observations through `adb`, `frida`, `emulator`, and `frida_probe`.
 - `mobsf_triage`: submits MobSF early with `mobsf_submit`, lets it run in the
   background, and later uses `mobsf_poll` to collect results without blocking
-  static reverse work.
+  static reverse work. `mobsf_findings` can normalize the JSON report into PRS
+  findings.
+- `exploitability_validation`: compiles findings and confirms practical
+  reachability where safe with `finding_compile`, `exploit_verify`,
+  `intent_fuzzer`, `backup_audit`, and `frida_probe`.
 - `report_synthesis`: combines specialist outputs into confirmed findings,
   hypotheses, blocked checks, evidence references, and next steps.
 
@@ -24,6 +31,12 @@ The `reverse_analysis_plan` tool returns these roles, workflows, handoffs, and
 guardrails as metadata. It is intentionally non-invasive: it does not run
 reverse-engineering commands, call MobSF, or alter device state. Bifrost can use
 the returned plan to decide which existing bounded tool to call next.
+
+In Bifrost crew mode, PRS starts static reverse, MobSF triage, and dynamic
+device readiness as parallel primary lanes. It then starts dependent
+secrets/WebView and exploitability validation lanes after primary artifacts and
+findings have had a chance to land. This keeps slow MobSF work asynchronous
+while avoiding source-scanner races against missing decompiler output.
 
 ## Docker
 

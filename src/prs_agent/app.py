@@ -24,13 +24,23 @@ from prs_agent.tools import (
     AdbTool,
     ApkMetadataTool,
     ApktoolDecompilerTool,
+    BackupAuditTool,
+    EmulatorTool,
+    ExploitVerifyTool,
+    FindingCompileTool,
     FridaTool,
+    FridaProbeTool,
+    IntentFuzzerTool,
     JadxDecompilerTool,
+    ManifestFindingsTool,
     MobSFJobStore,
+    MobSFFindingsTool,
     MobSFPollTool,
     MobSFScanTool,
     MobSFSubmitTool,
     ReverseAnalysisPlanTool,
+    SecretScanTool,
+    WebViewAuditTool,
 )
 
 
@@ -92,7 +102,7 @@ class RunManager:
         self._set_status(managed.run_id, "running")
         try:
             registry = build_registry(payload)
-            bifrost = build_bifrost(payload)
+            bifrost = build_bifrost(payload, run_id=managed.run_id)
             if (payload.get("bifrost") or {}).get("enabled"):
                 orchestrator = CrewOrchestrator(
                     bifrost=bifrost,
@@ -157,9 +167,16 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     registry.register(ReverseAnalysisPlanTool())
     registry.register(AdbTool())
     registry.register(ApkMetadataTool())
+    registry.register(ManifestFindingsTool())
     registry.register(ApktoolDecompilerTool())
     registry.register(JadxDecompilerTool())
+    registry.register(SecretScanTool())
+    registry.register(WebViewAuditTool())
     registry.register(FridaTool())
+    registry.register(EmulatorTool())
+    registry.register(IntentFuzzerTool())
+    registry.register(BackupAuditTool())
+    registry.register(FridaProbeTool())
     registry.register(
         MobSFSubmitTool(
             base_url=mobsf_config.get("base_url"),
@@ -174,29 +191,67 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
             api_key=mobsf_config.get("api_key"),
         )
     )
+    registry.register(MobSFFindingsTool())
+    registry.register(FindingCompileTool())
+    registry.register(ExploitVerifyTool())
     return registry
 
 
-def build_bifrost(payload: dict[str, Any]):
+def build_bifrost(payload: dict[str, Any], run_id: str | None = None):
     bifrost_config = payload.get("bifrost") or {}
+    mobsf_config = payload.get("mobsf") or {}
+    apk_stem = Path(payload["apk_path"]).stem if payload.get("apk_path") else "<apk_stem>"
+    context_hints = {
+        "apk_path": payload.get("apk_path"),
+        "run_id": run_id,
+        "include_device_checks": bool(payload.get("include_device_checks", True)),
+        "mobsf_configured": bool(mobsf_config.get("base_url") and mobsf_config.get("api_key")),
+        "mobsf_url": mobsf_config.get("base_url"),
+        "analysis_tools": [
+            "apk_metadata",
+            "manifest_findings",
+            "apktool_decompile",
+            "jadx_decompile",
+            "secret_scan",
+            "webview_audit",
+            "mobsf_submit",
+            "mobsf_poll",
+            "mobsf_findings",
+            "finding_compile",
+            "exploit_verify",
+            "emulator",
+            "intent_fuzzer",
+            "backup_audit",
+            "frida_probe",
+        ],
+        "artifact_conventions": {
+            "jadx_output": f"runs/{run_id}/artifacts/jadx/{apk_stem}" if run_id else "runs/<run_id>/artifacts/jadx/<apk_stem>",
+            "apktool_output": f"runs/{run_id}/artifacts/apktool/{apk_stem}" if run_id else "runs/<run_id>/artifacts/apktool/<apk_stem>",
+            "findings_dir": f"runs/{run_id}/artifacts/findings" if run_id else "runs/<run_id>/artifacts/findings",
+        },
+    }
     if bifrost_config.get("enabled"):
         return BifrostHTTPClient(
             gateway_url=bifrost_config["gateway_url"],
             api_key=bifrost_config["api_key"],
             model_name=bifrost_config.get("model") or "bifrost",
+            context_hints=context_hints,
         )
     return AssessmentPlannerClient(
         apk_path=payload.get("apk_path"),
         include_device_checks=bool(payload.get("include_device_checks", True)),
+        run_id=run_id,
     )
 
 
 def tool_health() -> dict[str, Any]:
     return {
         "adb": {"available": shutil.which("adb") is not None, "path": shutil.which("adb")},
+        "apk_metadata": {"available": True, "path": "pyaxmlparser primary path; aapt optional fallback"},
         "aapt": {"available": shutil.which("aapt") is not None, "path": shutil.which("aapt")},
         "apktool": {"available": shutil.which("apktool") is not None, "path": shutil.which("apktool")},
         "jadx": {"available": shutil.which("jadx") is not None, "path": shutil.which("jadx")},
+        "emulator": {"available": shutil.which("emulator") is not None, "path": shutil.which("emulator")},
         "frida": {"available": shutil.which("frida") is not None, "path": shutil.which("frida")},
         "frida-ps": {"available": shutil.which("frida-ps") is not None, "path": shutil.which("frida-ps")},
     }

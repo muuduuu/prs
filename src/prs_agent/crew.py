@@ -71,14 +71,33 @@ class CrewOrchestrator:
 
         roles = [role for role in REVERSE_ANALYSIS_SUBAGENTS if self._role_enabled(role.identifier)]
         lane_results: list[dict[str, Any]] = []
-        with ThreadPoolExecutor(max_workers=max(1, len(roles))) as executor:
+        primary_roles = [
+            role
+            for role in roles
+            if role.identifier in {"static_reverse", "mobsf_triage", "dynamic_device"}
+        ]
+        dependent_roles = [
+            role
+            for role in roles
+            if role.identifier not in {"static_reverse", "mobsf_triage", "dynamic_device", "report_synthesis"}
+        ]
+
+        with ThreadPoolExecutor(max_workers=max(1, len(primary_roles))) as executor:
             futures = {
-                executor.submit(self._run_lane, role, objective, context, logger): role.identifier
-                for role in roles
-                if role.identifier != "report_synthesis"
+                executor.submit(self._run_lane, role, objective, context, logger, []): role.identifier
+                for role in primary_roles
             }
             for future in as_completed(futures):
                 lane_results.append(future.result())
+
+        if dependent_roles:
+            with ThreadPoolExecutor(max_workers=max(1, len(dependent_roles))) as executor:
+                futures = {
+                    executor.submit(self._run_lane, role, objective, context, logger, lane_results): role.identifier
+                    for role in dependent_roles
+                }
+                for future in as_completed(futures):
+                    lane_results.append(future.result())
 
         final_answer = self._synthesize_report(objective, lane_results)
         logger.event(
@@ -98,9 +117,7 @@ class CrewOrchestrator:
     def _role_enabled(self, role_id: str) -> bool:
         if role_id == "dynamic_device":
             return self.config.include_device_checks
-        if role_id in {"static_reverse", "mobsf_triage", "report_synthesis"}:
-            return True
-        return False
+        return True
 
     def _run_lane(
         self,
@@ -108,8 +125,10 @@ class CrewOrchestrator:
         objective: str,
         context: ToolContext,
         logger: TraceLogger,
+        prior_results: list[dict[str, Any]],
     ) -> dict[str, Any]:
         memory = MemoryBuffer(max_items=10)
+        artifact_conventions = self._artifact_conventions(context)
         lane_context = {
             "agent_id": role.identifier,
             "agent_name": role.name,
@@ -117,6 +136,8 @@ class CrewOrchestrator:
             "apk_path": self.config.apk_path,
             "workflow": list(role.workflow),
             "outputs_expected": list(role.outputs),
+            "artifact_conventions": artifact_conventions,
+            "prior_lane_results": prior_results,
         }
         logger.event(
             phase="agent_start",
@@ -130,6 +151,8 @@ class CrewOrchestrator:
             tool_names.add("reverse_analysis_plan")
         if role.identifier == "mobsf_triage":
             tool_names.update({"mobsf_submit", "mobsf_poll"})
+        if role.identifier == "exploitability_validation":
+            tool_names.update({"finding_compile"})
 
         for _ in range(self.config.max_steps_per_agent):
             decision = self._decide_for_role(role, objective, tool_names, memory.snapshot(), lane_context)
@@ -207,6 +230,26 @@ class CrewOrchestrator:
             status = observation.get("metadata", {}).get("job_status")
             return status == "completed" or observation.get("status") == "validation_error"
         return observation.get("status") in {"validation_error", "error"} and role_id == "dynamic_device"
+
+    def _artifact_conventions(self, context: ToolContext) -> dict[str, str]:
+        if not self.config.apk_path:
+            return {
+                "findings_dir": self._workspace_relative(context.artifacts_dir / "findings", context),
+                "report_dir": self._workspace_relative(context.artifacts_dir / "report", context),
+            }
+        apk_stem = Path(self.config.apk_path).stem
+        return {
+            "jadx_output": self._workspace_relative(context.artifacts_dir / "jadx" / apk_stem, context),
+            "apktool_output": self._workspace_relative(context.artifacts_dir / "apktool" / apk_stem, context),
+            "findings_dir": self._workspace_relative(context.artifacts_dir / "findings", context),
+            "report_dir": self._workspace_relative(context.artifacts_dir / "report", context),
+        }
+
+    def _workspace_relative(self, path: Path, context: ToolContext) -> str:
+        try:
+            return str(path.resolve().relative_to(context.workspace_dir.resolve()))
+        except ValueError:
+            return str(path)
 
     def _synthesize_report(self, objective: str, lane_results: list[dict[str, Any]]) -> dict[str, Any]:
         report_role = next(

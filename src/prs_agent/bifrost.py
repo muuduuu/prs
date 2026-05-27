@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Protocol
 import urllib.error
 import urllib.request
@@ -45,11 +46,13 @@ class BifrostHTTPClient:
         api_key: str,
         model_name: str,
         timeout_seconds: int = 60,
+        context_hints: dict[str, Any] | None = None,
     ) -> None:
         self.gateway_url = normalize_chat_url(gateway_url)
         self.api_key = api_key
         self.model_name = model_name
         self.timeout_seconds = timeout_seconds
+        self.context_hints = context_hints or {}
 
     def decide(
         self,
@@ -107,11 +110,13 @@ class BifrostHTTPClient:
         memory: list[dict[str, Any]],
         extra_context: dict[str, Any],
     ) -> BifrostDecision:
+        context = dict(self.context_hints)
+        context.update(extra_context)
         user_payload = {
             "objective": objective,
             "available_tools": tool_schemas,
             "recent_memory": memory,
-            "context": extra_context,
+            "context": context,
             "response_schema": {
                 "tool_call": {
                     "type": "tool_call",
@@ -330,9 +335,16 @@ class AssessmentPlannerClient:
 
     model_name = "deterministic-assessment-planner"
 
-    def __init__(self, *, apk_path: str | None, include_device_checks: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        apk_path: str | None,
+        include_device_checks: bool = True,
+        run_id: str | None = None,
+    ) -> None:
         self.apk_path = apk_path
         self.include_device_checks = include_device_checks
+        self.run_id = run_id
         self._step = 0
         self._plan: list[tuple[str, str, dict[str, Any]]] | None = None
 
@@ -433,6 +445,14 @@ class AssessmentPlannerClient:
                         {"apk_path": self.apk_path},
                     )
                 )
+            if "manifest_findings" in available:
+                plan.append(
+                    (
+                        "manifest_findings",
+                        "Parse the manifest into structured security findings.",
+                        {"apk_path": self.apk_path},
+                    )
+                )
             if "apktool_decompile" in available:
                 plan.append(
                     (
@@ -441,6 +461,15 @@ class AssessmentPlannerClient:
                         {"apk_path": self.apk_path},
                     )
                 )
+                apktool_dir = self._artifact_dir("apktool")
+                if apktool_dir and "secret_scan" in available:
+                    plan.append(
+                        (
+                            "secret_scan",
+                            "Scan apktool output for embedded secrets and risky strings.",
+                            {"source_dir": apktool_dir},
+                        )
+                    )
             if "jadx_decompile" in available:
                 plan.append(
                     (
@@ -449,6 +478,24 @@ class AssessmentPlannerClient:
                         {"apk_path": self.apk_path},
                     )
                 )
+                jadx_dir = self._artifact_dir("jadx")
+                if jadx_dir:
+                    if "secret_scan" in available:
+                        plan.append(
+                            (
+                                "secret_scan",
+                                "Scan JADX source output for hardcoded credentials and sensitive endpoints.",
+                                {"source_dir": jadx_dir},
+                            )
+                        )
+                    if "webview_audit" in available:
+                        plan.append(
+                            (
+                                "webview_audit",
+                                "Audit decompiled sources for risky WebView and JavaScript bridge patterns.",
+                                {"source_dir": jadx_dir},
+                            )
+                        )
             if "mobsf_poll" in available and "mobsf_submit" in available:
                 plan.append(
                     (
@@ -465,7 +512,21 @@ class AssessmentPlannerClient:
                         {"apk_path": self.apk_path},
                     )
                 )
+            if "finding_compile" in available:
+                plan.append(
+                    (
+                        "finding_compile",
+                        "Compile all normalized tool findings into a single assessment report.",
+                        {},
+                    )
+                )
         return plan
+
+    def _artifact_dir(self, tool_group: str) -> str | None:
+        if not self.apk_path or not self.run_id:
+            return None
+        apk_stem = Path(self.apk_path).stem
+        return f"runs/{self.run_id}/artifacts/{tool_group}/{apk_stem}"
 
     def _collect_artifacts(self, memory: list[dict[str, Any]]) -> list[dict[str, Any]]:
         artifacts: list[dict[str, Any]] = []
