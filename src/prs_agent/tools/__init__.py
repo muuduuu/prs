@@ -6,6 +6,7 @@ from prs_agent.tools.apktool import ApktoolDecompilerTool
 from prs_agent.tools.backup_audit import BackupAuditTool
 from prs_agent.tools.base import BaseTool
 from prs_agent.tools.emulator import EmulatorTool
+from prs_agent.tools.exploit_chain import ExploitChainTool
 from prs_agent.tools.exploit_verify import ExploitVerifyTool
 from prs_agent.tools.finding_compile import FindingCompileTool
 from prs_agent.tools.frida import FridaTool
@@ -26,6 +27,7 @@ __all__ = [
     "BackupAuditTool",
     "BaseTool",
     "EmulatorTool",
+    "ExploitChainTool",
     "ExploitVerifyTool",
     "FindingCompileTool",
     "FridaTool",

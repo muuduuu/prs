@@ -24,11 +24,19 @@ PRS is a local, API-driven ReAct orchestrator for authorized Android application
   - `mobsf_submit` / `mobsf_poll`: asynchronous MobSF analysis lane.
   - `mobsf_scan`: synchronous MobSF fallback for direct scans.
   - `mobsf_findings`: MobSF JSON report parser into the unified findings shape.
-  - `finding_compile` / `exploit_verify`: consolidated report and confirmed/unverified validation table.
+  - `finding_compile` / `exploit_verify` / `exploit_chain`: consolidated report,
+    confirmed/unverified validation table, CWE/CVSS enrichment, and chained
+    attack-path modeling.
 - JSONL and final JSON traces in `runs/<run_id>/logs/` for later SFT dataset conversion.
 - Reverse-analysis subagent scaffold exposed through `reverse_analysis_plan` for
   static reverse, dynamic/device checks, MobSF triage, secrets/WebView review,
-  exploitability validation, and report synthesis.
+  exploitability validation, attack-path chaining, and report synthesis.
+
+The exploitability layer is built for authorized professional assessment. It
+does not generate weaponized payloads or autonomous compromise workflows. It
+does produce the pieces a pentester needs: linked findings, preconditions,
+confirmed versus hypothetical chain state, CWE names, approximate CVSS scores,
+bounded validation steps, evidence references, and remediation priorities.
 
 ## Run Locally
 

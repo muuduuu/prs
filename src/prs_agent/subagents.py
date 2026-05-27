@@ -112,16 +112,17 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
         identifier="exploitability_validation",
         name="Exploitability Validation Analyst",
         mission="Confirm whether high-risk findings are practically reachable using bounded, authorized probes.",
-        tool_focus=("finding_compile", "exploit_verify", "intent_fuzzer", "backup_audit", "frida_probe"),
+        tool_focus=("finding_compile", "exploit_verify", "exploit_chain", "intent_fuzzer", "backup_audit", "frida_probe"),
         workflow=(
             "Compile normalized findings from static, scanner, and runtime lanes.",
             "Prioritize high-severity items that have safe confirmation methods.",
             "Use bounded runtime probes only on connected devices or emulators owned by the tester.",
+            "Build attack paths that connect entry points, weaknesses, evidence, preconditions, CWE, CVSS, and impact.",
             "Separate confirmed findings from unverified hypotheses and blocked checks.",
             "Record verification artifacts and commands through tool results, not free-form shell output.",
         ),
         inputs=("manifest findings", "secret findings", "WebView findings", "MobSF findings", "package name", "device readiness"),
-        outputs=("compiled findings report", "verification table", "confirmed exploitability evidence", "blocked checks"),
+        outputs=("compiled findings report", "verification table", "attack-path chains", "confirmed exploitability evidence", "blocked checks"),
         guardrails=(
             "Do not generate weaponized payloads, persistence, stealth, or data theft workflows.",
             "Keep probes bounded, reversible, and scoped to the provided package.",
@@ -224,7 +225,7 @@ def build_reverse_analysis_plan(
             {
                 "from": "exploitability_validation",
                 "to": "report_synthesis",
-                "payload": "compiled findings, verification table, and confirmed evidence",
+                "payload": "compiled findings, verification table, attack-path chains, and confirmed evidence",
                 "enabled": True,
             },
         ],

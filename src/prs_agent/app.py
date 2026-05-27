@@ -26,6 +26,7 @@ from prs_agent.tools import (
     ApktoolDecompilerTool,
     BackupAuditTool,
     EmulatorTool,
+    ExploitChainTool,
     ExploitVerifyTool,
     FindingCompileTool,
     FridaTool,
@@ -194,6 +195,7 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     registry.register(MobSFFindingsTool())
     registry.register(FindingCompileTool())
     registry.register(ExploitVerifyTool())
+    registry.register(ExploitChainTool())
     return registry
 
 
@@ -219,6 +221,7 @@ def build_bifrost(payload: dict[str, Any], run_id: str | None = None):
             "mobsf_findings",
             "finding_compile",
             "exploit_verify",
+            "exploit_chain",
             "emulator",
             "intent_fuzzer",
             "backup_audit",

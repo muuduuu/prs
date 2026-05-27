@@ -520,6 +520,14 @@ class AssessmentPlannerClient:
                         {},
                     )
                 )
+            if "exploit_chain" in available:
+                plan.append(
+                    (
+                        "exploit_chain",
+                        "Build CWE/CVSS-enriched attack paths from the compiled findings.",
+                        {},
+                    )
+                )
         return plan
 
     def _artifact_dir(self, tool_group: str) -> str | None:

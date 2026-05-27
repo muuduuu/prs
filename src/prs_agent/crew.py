@@ -152,7 +152,7 @@ class CrewOrchestrator:
         if role.identifier == "mobsf_triage":
             tool_names.update({"mobsf_submit", "mobsf_poll"})
         if role.identifier == "exploitability_validation":
-            tool_names.update({"finding_compile"})
+            tool_names.update({"finding_compile", "exploit_chain"})
 
         for _ in range(self.config.max_steps_per_agent):
             decision = self._decide_for_role(role, objective, tool_names, memory.snapshot(), lane_context)

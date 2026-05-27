@@ -21,7 +21,7 @@ arguments.
   findings.
 - `exploitability_validation`: compiles findings and confirms practical
   reachability where safe with `finding_compile`, `exploit_verify`,
-  `intent_fuzzer`, `backup_audit`, and `frida_probe`.
+  `exploit_chain`, `intent_fuzzer`, `backup_audit`, and `frida_probe`.
 - `report_synthesis`: combines specialist outputs into confirmed findings,
   hypotheses, blocked checks, evidence references, and next steps.
 
@@ -35,8 +35,11 @@ the returned plan to decide which existing bounded tool to call next.
 In Bifrost crew mode, PRS starts static reverse, MobSF triage, and dynamic
 device readiness as parallel primary lanes. It then starts dependent
 secrets/WebView and exploitability validation lanes after primary artifacts and
-findings have had a chance to land. This keeps slow MobSF work asynchronous
-while avoiding source-scanner races against missing decompiler output.
+findings have had a chance to land. The validation lane then builds CWE/CVSS
+enriched attack paths that connect findings into realistic chains with
+preconditions, confidence, impact, bounded validation steps, and remediation.
+This keeps slow MobSF work asynchronous while avoiding source-scanner races
+against missing decompiler output.
 
 ## Docker
 
