@@ -10,6 +10,7 @@ from prs_agent.context import MemoryBuffer, compact_tool_result
 from prs_agent.contracts import AgentRunResult, ToolContext, new_run_id
 from prs_agent.logger import TraceLogger
 from prs_agent.registry import ToolRegistry
+from prs_agent.subagents import specialist_manifest
 
 
 class AgentOrchestrator:
@@ -53,6 +54,11 @@ class AgentOrchestrator:
             log_path=trace_jsonl,
             bifrost_model=self.bifrost.model_name,
             on_event=self.on_event,
+        )
+        logger.event(
+            phase="subagent_manifest",
+            observation={"subagents": specialist_manifest()},
+            labels={"success": True, "requires_human_review": False},
         )
 
         final_answer: dict[str, Any] = {}

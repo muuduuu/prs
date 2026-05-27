@@ -6,6 +6,7 @@ const state = {
 
 const els = {
   healthList: document.querySelector("#healthList"),
+  subagentList: document.querySelector("#subagentList"),
   refreshHealth: document.querySelector("#refreshHealth"),
   apkFile: document.querySelector("#apkFile"),
   selectedApk: document.querySelector("#selectedApk"),
@@ -47,6 +48,17 @@ async function loadHealth() {
     `;
     row.title = info.path || "Not found on PATH";
     els.healthList.appendChild(row);
+  }
+  els.subagentList.innerHTML = "";
+  for (const subagent of payload.subagents || []) {
+    const row = document.createElement("div");
+    row.className = "health-item";
+    row.innerHTML = `
+      <strong>${escapeHtml(subagent.name)}</strong>
+      <span class="success">${escapeHtml((subagent.tool_names || []).length)} tools</span>
+    `;
+    row.title = subagent.mission;
+    els.subagentList.appendChild(row);
   }
 }
 

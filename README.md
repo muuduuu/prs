@@ -15,6 +15,8 @@ PRS is a local, API-driven ReAct orchestrator for authorized Android application
   - `frida`: CLI readiness and USB process listing.
   - `mobsf_scan`: APK upload to a configured MobSF server.
 - JSONL and final JSON traces in `runs/<run_id>/logs/` for later SFT dataset conversion.
+- Reverse-analysis subagent scaffold exposed through `reverse_analysis_plan` for
+  static reverse, dynamic/device checks, MobSF triage, and report synthesis.
 
 ## Run Locally
 
@@ -28,6 +30,25 @@ prs-agent-app
 ```
 
 Open `http://127.0.0.1:8787`.
+
+## Run with Docker
+
+```bash
+docker compose up --build
+```
+
+Open PRS at `http://127.0.0.1:8787`.
+
+Open MobSF at `http://127.0.0.1:8000`, copy the MobSF API key, then put this in the PRS MobSF panel:
+
+```text
+Server URL: http://mobsf:8000
+API key: <MobSF API key>
+```
+
+Use `http://mobsf:8000` from inside Docker Compose. If you run PRS directly on your host, use `http://127.0.0.1:8000`.
+
+See `docs/reverse_analysis_subagents.md` for the subagent scaffold and Docker notes.
 
 If you do not install the package, run directly:
 

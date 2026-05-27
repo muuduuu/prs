@@ -301,7 +301,7 @@ class AssessmentPlannerClient:
     ) -> BifrostDecision:
         available = {tool["name"] for tool in tool_schemas}
         if self._plan is None:
-            self._plan = self._build_plan(available)
+            self._plan = self._build_plan(available, objective)
 
         if self._step < len(self._plan):
             tool_name, thought, arguments = self._plan[self._step]
@@ -333,8 +333,24 @@ class AssessmentPlannerClient:
             },
         )
 
-    def _build_plan(self, available: set[str]) -> list[tuple[str, str, dict[str, Any]]]:
+    def _build_plan(self, available: set[str], objective: str) -> list[tuple[str, str, dict[str, Any]]]:
         plan: list[tuple[str, str, dict[str, Any]]] = []
+        if "reverse_analysis_plan" in available:
+            arguments: dict[str, Any] = {
+                "objective": objective,
+                "include_dynamic": self.include_device_checks,
+                "include_mobsf": True,
+            }
+            if self.apk_path:
+                arguments["apk_path"] = self.apk_path
+            plan.append(
+                (
+                    "reverse_analysis_plan",
+                    "Start by laying out the reverse-analysis specialist lanes and handoffs.",
+                    arguments,
+                )
+            )
+
         if self.include_device_checks and "adb" in available:
             plan.extend(
                 [

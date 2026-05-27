@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 from prs_agent.contracts import Artifact, ToolContext, ToolResult, ToolStatus
 from prs_agent.tools.base import BaseTool
 from prs_agent.tools.pathing import resolve_workspace_file
+
+
+class MobSFAPIError(RuntimeError):
+    """MobSF API failure with captured response body."""
+
+    def __init__(self, message: str, *, status: int | None = None, body: str = "") -> None:
+        super().__init__(message)
+        self.status = status
+        self.body = body
 
 
 class MobSFScanTool(BaseTool):
@@ -50,6 +61,11 @@ class MobSFScanTool(BaseTool):
             "Content-Type: application/vnd.android.package-archive\r\n\r\n"
         ).encode("utf-8") + file_bytes + f"\r\n--{boundary}--\r\n".encode("utf-8")
 
+        upload_payload: dict[str, Any] = {}
+        scan_payload: dict[str, Any] = {}
+        report_payload: dict[str, Any] = {}
+        report_error: str | None = None
+
         try:
             upload_payload = self._upload(body, boundary, context.timeout_seconds)
             scan_hash = upload_payload.get("hash")
@@ -66,17 +82,41 @@ class MobSFScanTool(BaseTool):
                 },
                 context.timeout_seconds,
             )
-            report_payload = self._post_form(
-                "/api/v1/report_json",
-                {"hash": scan_hash},
-                context.timeout_seconds,
-            )
+            try:
+                report_payload = self._post_form(
+                    "/api/v1/report_json",
+                    {"hash": scan_hash},
+                    context.timeout_seconds,
+                )
+                if str(report_payload.get("report", "")).lower() == "report not found":
+                    report_error = "MobSF report_json returned Report not Found; using scan response as report."
+                    report_payload = scan_payload
+            except MobSFAPIError as exc:
+                report_error = f"{exc} Body: {exc.body[:500]}"
+                report_payload = scan_payload
         except Exception as exc:
+            error_dir = context.artifacts_dir / "mobsf"
+            error_dir.mkdir(parents=True, exist_ok=True)
+            error_path = error_dir / f"{Path(apk_path).stem}-error.json"
+            error_path.write_text(
+                json.dumps(
+                    {
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                        "upload_response": upload_payload,
+                        "scan_response": scan_payload,
+                        "response_body": getattr(exc, "body", ""),
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
             return ToolResult(
                 tool_name=self.name,
                 status=ToolStatus.ERROR,
                 summary="MobSF scan workflow failed.",
                 error=f"{type(exc).__name__}: {exc}",
+                artifacts=[Artifact(kind="json", path=str(error_path), description="MobSF failure details")],
             )
 
         mobsf_dir = context.artifacts_dir / "mobsf"
@@ -87,16 +127,19 @@ class MobSFScanTool(BaseTool):
         upload_path.write_text(json.dumps(upload_payload, indent=2), encoding="utf-8")
         scan_path.write_text(json.dumps(scan_payload, indent=2), encoding="utf-8")
         report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
+        summary = "Completed MobSF upload, static scan, and JSON report retrieval."
+        if report_error:
+            summary = "Completed MobSF upload and static scan. report_json failed, so scan response was saved as report."
         return ToolResult(
             tool_name=self.name,
             status=ToolStatus.SUCCESS,
-            summary="Completed MobSF upload, static scan, and JSON report retrieval.",
+            summary=summary,
             artifacts=[
                 Artifact(kind="json", path=str(upload_path), description="MobSF upload response"),
                 Artifact(kind="json", path=str(scan_path), description="MobSF scan response"),
                 Artifact(kind="json", path=str(report_path), description="MobSF JSON report"),
             ],
-            metadata={"hash": upload_payload.get("hash")},
+            metadata={"hash": upload_payload.get("hash"), "report_json_error": report_error},
         )
 
     def _upload(self, body: bytes, boundary: str, timeout_seconds: int) -> dict:
@@ -105,12 +148,13 @@ class MobSFScanTool(BaseTool):
             data=body,
             headers={
                 "Authorization": self.api_key or "",
+                "Accept": "application/json",
                 "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "User-Agent": "prs-agent/0.1",
             },
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            return json.loads(response.read().decode("utf-8"))
+        return self._open_json(request, timeout_seconds)
 
     def _post_form(self, endpoint: str, values: dict[str, str | None], timeout_seconds: int) -> dict:
         data = urllib.parse.urlencode({key: value for key, value in values.items() if value is not None}).encode(
@@ -121,9 +165,39 @@ class MobSFScanTool(BaseTool):
             data=data,
             headers={
                 "Authorization": self.api_key or "",
+                "Accept": "application/json",
                 "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "prs-agent/0.1",
             },
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            return json.loads(response.read().decode("utf-8"))
+        return self._open_json(request, timeout_seconds)
+
+    def _open_json(self, request: urllib.request.Request, timeout_seconds: int) -> dict[str, Any]:
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                body = response.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            raise MobSFAPIError(
+                f"MobSF HTTP {exc.code} calling {request.full_url}",
+                status=exc.code,
+                body=body,
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise MobSFAPIError(f"MobSF connection error calling {request.full_url}: {exc}") from exc
+
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise MobSFAPIError(
+                f"MobSF returned non-JSON response from {request.full_url}",
+                body=body[:1000],
+            ) from exc
+
+        if isinstance(payload, dict) and payload.get("error"):
+            raise MobSFAPIError(
+                f"MobSF API error from {request.full_url}: {payload.get('error')}",
+                body=json.dumps(payload)[:1000],
+            )
+        return payload

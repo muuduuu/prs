@@ -18,6 +18,7 @@ from prs_agent.bifrost import AssessmentPlannerClient, BifrostHTTPClient, fetch_
 from prs_agent.contracts import AgentRunResult, new_run_id, utc_now_iso
 from prs_agent.orchestrator import AgentOrchestrator
 from prs_agent.registry import ToolRegistry
+from prs_agent.subagents import specialist_manifest
 from prs_agent.tools import (
     AdbTool,
     ApkMetadataTool,
@@ -25,6 +26,7 @@ from prs_agent.tools import (
     FridaTool,
     JadxDecompilerTool,
     MobSFScanTool,
+    ReverseAnalysisPlanTool,
 )
 
 
@@ -133,6 +135,7 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     payload = payload or {}
     mobsf_config = payload.get("mobsf") or {}
     registry = ToolRegistry()
+    registry.register(ReverseAnalysisPlanTool())
     registry.register(AdbTool())
     registry.register(ApkMetadataTool())
     registry.register(ApktoolDecompilerTool())
@@ -181,7 +184,7 @@ class AppHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path == "/api/health":
-            self._json({"status": "ok", "tools": tool_health()})
+            self._json({"status": "ok", "tools": tool_health(), "subagents": specialist_manifest()})
             return
 
         if parsed.path == "/api/runs":

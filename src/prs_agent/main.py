@@ -7,11 +7,12 @@ from pathlib import Path
 from prs_agent.bifrost import MockBifrostClient
 from prs_agent.orchestrator import AgentOrchestrator
 from prs_agent.registry import ToolRegistry
-from prs_agent.tools import AdbTool, ApktoolDecompilerTool
+from prs_agent.tools import AdbTool, ApktoolDecompilerTool, ReverseAnalysisPlanTool
 
 
 def build_default_registry() -> ToolRegistry:
     registry = ToolRegistry()
+    registry.register(ReverseAnalysisPlanTool())
     registry.register(AdbTool())
     registry.register(ApktoolDecompilerTool())
     return registry

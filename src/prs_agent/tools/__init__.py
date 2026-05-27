@@ -7,6 +7,7 @@ from prs_agent.tools.base import BaseTool
 from prs_agent.tools.frida import FridaTool
 from prs_agent.tools.jadx import JadxDecompilerTool
 from prs_agent.tools.mobsf import MobSFScanTool
+from prs_agent.tools.subagents import ReverseAnalysisPlanTool
 
 __all__ = [
     "AdbTool",
@@ -16,4 +17,5 @@ __all__ = [
     "FridaTool",
     "JadxDecompilerTool",
     "MobSFScanTool",
+    "ReverseAnalysisPlanTool",
 ]
