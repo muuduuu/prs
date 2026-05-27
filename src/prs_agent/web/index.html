@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PRS Mobile Pentest Agent</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">PRS</div>
+          <div>
+            <h1>Mobile Pentest Agent</h1>
+            <p>Autonomous ReAct orchestrator</p>
+          </div>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Tool Readiness</h2>
+            <button class="icon-button" id="refreshHealth" title="Refresh tool readiness">R</button>
+          </div>
+          <div class="health-list" id="healthList"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Bifrost</h2>
+          <label class="toggle-row">
+            <input type="checkbox" id="useBifrost" />
+            <span>Use gateway</span>
+          </label>
+          <label>
+            Gateway URL
+            <input id="gatewayUrl" placeholder="https://bifrost.example/v1/chat/completions" />
+          </label>
+          <label>
+            API key
+            <input id="apiKey" type="password" placeholder="Stored only in this browser request" />
+          </label>
+          <label>
+            Models URL
+            <input id="modelsUrl" placeholder="Optional: https://bifrost.example/v1/models" />
+          </label>
+          <div class="model-row">
+            <label>
+              Model
+              <select id="modelSelect">
+                <option value="">Load from gateway</option>
+              </select>
+            </label>
+            <button class="secondary-button" id="loadModels">Load</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>MobSF</h2>
+          <label>
+            Server URL
+            <input id="mobsfUrl" placeholder="http://127.0.0.1:8000" />
+          </label>
+          <label>
+            API key
+            <input id="mobsfKey" type="password" placeholder="MobSF REST API key" />
+          </label>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <section class="runbar">
+          <div>
+            <h2>Assessment</h2>
+            <p id="runState">Idle</p>
+          </div>
+          <button id="startRun" class="primary-button">Start Run</button>
+        </section>
+
+        <section class="target-grid">
+          <div class="surface">
+            <h3>Target</h3>
+            <label>
+              APK
+              <input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive" />
+            </label>
+            <div class="selected-file" id="selectedApk">No APK uploaded</div>
+            <label class="toggle-row compact">
+              <input type="checkbox" id="includeDeviceChecks" checked />
+              <span>Include connected device checks</span>
+            </label>
+          </div>
+
+          <div class="surface">
+            <h3>Objective</h3>
+            <textarea id="objective">Run an initial authorized mobile app assessment. Check device connectivity, inspect APK metadata, decompile resources and source when available, submit to MobSF if configured, collect artifacts, and summarize what succeeded or is blocked.</textarea>
+          </div>
+        </section>
+
+        <section class="split">
+          <div class="surface events-surface">
+            <div class="panel-head">
+              <h3>Live Trace</h3>
+              <span id="eventCount">0 events</span>
+            </div>
+            <div class="timeline" id="timeline"></div>
+          </div>
+
+          <div class="surface report-surface">
+            <h3>Final Report</h3>
+            <pre id="finalReport">{}</pre>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+[project]
+name = "prs-agent"
+version = "0.1.0"
+description = "Autonomous mobile application penetration testing agent orchestration skeleton."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+prs-agent = "prs_agent.main:main"
+prs-agent-app = "prs_agent.app:serve"
+
+[tool.setuptools.packages.find]
+where = ["src"]
