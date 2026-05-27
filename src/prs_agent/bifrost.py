@@ -46,7 +46,7 @@ class BifrostHTTPClient:
         model_name: str,
         timeout_seconds: int = 60,
     ) -> None:
-        self.gateway_url = gateway_url
+        self.gateway_url = normalize_chat_url(gateway_url)
         self.api_key = api_key
         self.model_name = model_name
         self.timeout_seconds = timeout_seconds
@@ -108,11 +108,33 @@ class BifrostHTTPClient:
         try:
             with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
                 payload = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:500]
+            hint = ""
+            if exc.code == 405:
+                hint = (
+                    " The Bifrost Gateway URL must accept POST chat requests. "
+                    "Use the chat/completions endpoint, not the models endpoint."
+                )
+            return BifrostDecision(
+                type="final",
+                thought="Bifrost gateway request failed.",
+                answer={
+                    "summary": f"Bifrost gateway HTTP {exc.code}: {exc.reason}.{hint}",
+                    "details": detail,
+                    "gateway_url": self.gateway_url,
+                    "findings": [],
+                },
+            )
         except urllib.error.URLError as exc:
             return BifrostDecision(
                 type="final",
                 thought="Bifrost gateway request failed.",
-                answer={"summary": f"Bifrost gateway error: {exc}", "findings": []},
+                answer={
+                    "summary": f"Bifrost gateway error: {exc}",
+                    "gateway_url": self.gateway_url,
+                    "findings": [],
+                },
             )
 
         content = self._extract_content(payload)
@@ -141,10 +163,25 @@ class BifrostHTTPClient:
         return json.dumps(payload)
 
 
+def normalize_chat_url(gateway_url: str) -> str:
+    """Normalize common Bifrost/OpenAI-style URLs to the POST chat endpoint."""
+
+    clean = gateway_url.rstrip("/")
+    for suffix in ("/chat/completions", "/responses"):
+        if clean.endswith(suffix):
+            return clean
+    if clean.endswith("/models"):
+        return clean[: -len("/models")] + "/chat/completions"
+    parsed = urlparse(clean)
+    if parsed.path in ("", "/", "/v1"):
+        return clean + "/chat/completions"
+    return clean
+
+
 def derive_models_url(gateway_url: str) -> str:
     """Infer an OpenAI-compatible models endpoint from a chat endpoint."""
 
-    clean = gateway_url.rstrip("/")
+    clean = normalize_chat_url(gateway_url)
     for suffix in ("/chat/completions", "/responses"):
         if clean.endswith(suffix):
             return clean[: -len(suffix)] + "/models"

@@ -81,9 +81,9 @@ Frida process listing requires a compatible Frida server on rooted devices or an
 ## Bifrost Setup
 
 1. Check `Use gateway`.
-2. Enter the Bifrost chat endpoint, for example `https://bifrost.example/v1/chat/completions`.
+2. Enter the Bifrost chat endpoint, for example `https://bifrost.example/v1/chat/completions`. You can also enter a base `/v1` URL or a `/models` URL; PRS normalizes common OpenAI-compatible URLs for chat calls.
 3. Enter the API key.
-4. Optionally enter a models endpoint. If blank, PRS derives `/v1/models` from common chat endpoint paths.
+4. Optionally enter a models endpoint. If blank, PRS derives `/v1/models` from common chat endpoint paths. Model loading uses GET; agent planning uses POST to the chat endpoint.
 5. Click `Load`.
 6. Choose a model.
 7. Start the run.
