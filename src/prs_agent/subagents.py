@@ -55,16 +55,17 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
     SubagentRole(
         identifier="secret_webview",
         name="Secrets and WebView Analyst",
-        mission="Turn decompiled artifacts into focused findings for embedded secrets and unsafe WebView behavior.",
-        tool_focus=("secret_scan", "webview_audit"),
+        mission="Turn decompiled artifacts into focused findings for embedded secrets, endpoints, storage, IPC, and unsafe WebView behavior.",
+        tool_focus=("source_inventory", "secret_scan", "webview_audit"),
         workflow=(
             "Wait for or consume JADX/apktool output directories produced by the static reverse lane.",
+            "Inventory URLs, endpoints, deep links, cloud references, storage APIs, crypto APIs, auth flows, native libraries, and IPC usage.",
             "Scan code, resources, smali, and configuration files for credential-shaped literals and sensitive endpoints.",
             "Audit WebView settings, JavaScript bridges, file access, SSL-error handling, mixed content, and debugging toggles.",
             "Emit normalized findings with file paths, line numbers, redacted snippets, and confidence notes.",
         ),
         inputs=("jadx artifacts", "apktool artifacts", "artifact conventions"),
-        outputs=("secret findings", "WebView findings", "source evidence references"),
+        outputs=("source inventory", "secret findings", "WebView findings", "source evidence references"),
         guardrails=(
             "Redact secrets in observations and reports.",
             "Do not exfiltrate or validate third-party credentials.",
@@ -219,7 +220,7 @@ def build_reverse_analysis_plan(
             {
                 "from": "secret_webview",
                 "to": "exploitability_validation",
-                "payload": "secret and WebView findings requiring confirmation or manual review",
+                "payload": "source inventory, secret, and WebView findings requiring confirmation or manual review",
                 "enabled": True,
             },
             {

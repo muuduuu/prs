@@ -14,6 +14,9 @@ PRS is a local, API-driven ReAct orchestrator for authorized Android application
   - `manifest_findings`: manifest risk findings for debug flags, backups, cleartext, exported components, permissions, SDK levels, and network security config.
   - `apktool`: resources and smali decompilation.
   - `jadx`: Java/Kotlin-like source decompilation.
+  - `source_inventory`: broad search across decompiled output for URLs,
+    endpoints, deeplinks, Firebase/S3 hints, GraphQL, storage APIs, crypto APIs,
+    auth/token references, native libraries, and IPC usage.
   - `secret_scan`: decompiled source scanner with redacted secret evidence.
   - `webview_audit`: risky WebView/JavaScript bridge configuration scanner.
   - `frida`: CLI readiness and USB process listing.

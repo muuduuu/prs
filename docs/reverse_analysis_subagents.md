@@ -12,7 +12,10 @@ arguments.
   code using `apk_metadata`, `manifest_findings`, `apktool_decompile`, and
   `jadx_decompile`.
 - `secret_webview`: consumes decompiled source directories and emits focused
-  findings from `secret_scan` and `webview_audit` with redacted evidence.
+  findings from `source_inventory`, `secret_scan`, and `webview_audit` with
+  redacted evidence. This lane inventories URLs, endpoints, deeplinks, cloud
+  references, auth/token handling, storage, crypto, native loading, and IPC
+  usage before the report is compiled.
 - `dynamic_device`: checks authorized device readiness and bounded runtime
   observations through `adb`, `frida`, `emulator`, and `frida_probe`.
 - `mobsf_triage`: submits MobSF early with `mobsf_submit`, lets it run in the

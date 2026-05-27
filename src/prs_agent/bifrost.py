@@ -463,6 +463,14 @@ class AssessmentPlannerClient:
                 )
                 apktool_dir = self._artifact_dir("apktool")
                 if apktool_dir and "secret_scan" in available:
+                    if "source_inventory" in available:
+                        plan.append(
+                            (
+                                "source_inventory",
+                                "Inventory apktool resources and smali for endpoints, deeplinks, storage, crypto, auth, native, and IPC clues.",
+                                {"source_dir": apktool_dir},
+                            )
+                        )
                     plan.append(
                         (
                             "secret_scan",
@@ -480,6 +488,14 @@ class AssessmentPlannerClient:
                 )
                 jadx_dir = self._artifact_dir("jadx")
                 if jadx_dir:
+                    if "source_inventory" in available:
+                        plan.append(
+                            (
+                                "source_inventory",
+                                "Inventory JADX sources for URLs, API surfaces, auth flows, storage, crypto, native libraries, and IPC usage.",
+                                {"source_dir": jadx_dir},
+                            )
+                        )
                     if "secret_scan" in available:
                         plan.append(
                             (

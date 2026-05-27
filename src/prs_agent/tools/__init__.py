@@ -17,6 +17,7 @@ from prs_agent.tools.manifest_findings import ManifestFindingsTool
 from prs_agent.tools.mobsf import MobSFJobStore, MobSFPollTool, MobSFScanTool, MobSFSubmitTool
 from prs_agent.tools.mobsf_findings import MobSFFindingsTool
 from prs_agent.tools.secret_scan import SecretScanTool
+from prs_agent.tools.source_inventory import SourceInventoryTool
 from prs_agent.tools.subagents import ReverseAnalysisPlanTool
 from prs_agent.tools.webview_audit import WebViewAuditTool
 
@@ -42,5 +43,6 @@ __all__ = [
     "MobSFSubmitTool",
     "ReverseAnalysisPlanTool",
     "SecretScanTool",
+    "SourceInventoryTool",
     "WebViewAuditTool",
 ]

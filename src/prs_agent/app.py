@@ -41,6 +41,7 @@ from prs_agent.tools import (
     MobSFSubmitTool,
     ReverseAnalysisPlanTool,
     SecretScanTool,
+    SourceInventoryTool,
     WebViewAuditTool,
 )
 
@@ -171,6 +172,7 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     registry.register(ManifestFindingsTool())
     registry.register(ApktoolDecompilerTool())
     registry.register(JadxDecompilerTool())
+    registry.register(SourceInventoryTool())
     registry.register(SecretScanTool())
     registry.register(WebViewAuditTool())
     registry.register(FridaTool())
@@ -214,6 +216,7 @@ def build_bifrost(payload: dict[str, Any], run_id: str | None = None):
             "manifest_findings",
             "apktool_decompile",
             "jadx_decompile",
+            "source_inventory",
             "secret_scan",
             "webview_audit",
             "mobsf_submit",
