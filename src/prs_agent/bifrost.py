@@ -373,6 +373,14 @@ class AssessmentPlannerClient:
             )
 
         if self.apk_path:
+            if "mobsf_submit" in available:
+                plan.append(
+                    (
+                        "mobsf_submit",
+                        "Start MobSF early so its slower scanner lane can run while other specialists continue.",
+                        {"apk_path": self.apk_path},
+                    )
+                )
             if "apk_metadata" in available:
                 plan.append(
                     (
@@ -397,7 +405,15 @@ class AssessmentPlannerClient:
                         {"apk_path": self.apk_path},
                     )
                 )
-            if "mobsf_scan" in available:
+            if "mobsf_poll" in available and "mobsf_submit" in available:
+                plan.append(
+                    (
+                        "mobsf_poll",
+                        "Check whether the MobSF specialist lane has finished and collect its artifacts.",
+                        {"wait_seconds": 20},
+                    )
+                )
+            elif "mobsf_scan" in available:
                 plan.append(
                     (
                         "mobsf_scan",

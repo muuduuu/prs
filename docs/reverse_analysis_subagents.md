@@ -10,8 +10,9 @@ registered tools with validated arguments.
   code using `apk_metadata`, `apktool_decompile`, and `jadx_decompile`.
 - `dynamic_device`: checks authorized device readiness and bounded runtime
   observations through `adb` and `frida`.
-- `mobsf_triage`: treats MobSF output as scanner triage, deduplicates it against
-  local evidence, and queues uncertain items for manual review.
+- `mobsf_triage`: submits MobSF early with `mobsf_submit`, lets it run in the
+  background, and later uses `mobsf_poll` to collect results without blocking
+  static reverse work.
 - `report_synthesis`: combines specialist outputs into confirmed findings,
   hypotheses, blocked checks, evidence references, and next steps.
 

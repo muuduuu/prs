@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from prs_agent.contracts import Artifact, ToolContext, ToolResult, ToolStatus
 from prs_agent.tools.base import BaseTool
@@ -23,36 +27,76 @@ class MobSFAPIError(RuntimeError):
         self.body = body
 
 
-class MobSFScanTool(BaseTool):
-    """Upload an APK to MobSF, start static analysis, and fetch the JSON report."""
+@dataclass(slots=True)
+class MobSFJob:
+    """Background MobSF job state."""
 
-    name = "mobsf_scan"
-    description = "Upload an APK to MobSF, run static analysis, and save upload/scan/report JSON artifacts."
-    args_schema = {
-        "type": "object",
-        "required": ["apk_path"],
-        "properties": {
-            "apk_path": {"type": "string", "description": "Path to an APK inside the workspace."}
-        },
-    }
+    job_id: str
+    run_id: str
+    apk_name: str
+    status: str = "queued"
+    hash: str | None = None
+    summary: str = "MobSF job queued."
+    artifacts: list[Artifact] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
 
-    def __init__(self, *, base_url: str | None = None, api_key: str | None = None) -> None:
-        self.base_url = base_url.rstrip("/") if base_url else None
-        self.api_key = api_key
 
-    def run(self, *, arguments: dict, context: ToolContext) -> ToolResult:
-        if not self.base_url or not self.api_key:
-            return ToolResult(
-                tool_name=self.name,
-                status=ToolStatus.VALIDATION_ERROR,
-                summary="MobSF is not configured.",
-                error="Provide MobSF URL and API key in the app before running this tool.",
-            )
+class MobSFJobStore:
+    """Thread-safe in-memory job store for one app process."""
 
-        apk_path, error = resolve_workspace_file(context, arguments["apk_path"], self.name)
-        if error:
-            return error
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._jobs: dict[str, MobSFJob] = {}
+        self._latest_by_run: dict[str, str] = {}
 
+    def create(self, *, run_id: str, apk_name: str) -> MobSFJob:
+        job = MobSFJob(job_id=f"mobsf-{uuid4().hex[:10]}", run_id=run_id, apk_name=apk_name)
+        with self._lock:
+            self._jobs[job.job_id] = job
+            self._latest_by_run[run_id] = job.job_id
+        return job
+
+    def update(self, job_id: str, **changes: Any) -> None:
+        with self._lock:
+            job = self._jobs[job_id]
+            for key, value in changes.items():
+                setattr(job, key, value)
+            job.updated_at = time.time()
+
+    def get(self, job_id: str | None, run_id: str) -> MobSFJob | None:
+        with self._lock:
+            resolved = job_id or self._latest_by_run.get(run_id)
+            if not resolved:
+                return None
+            return self._jobs.get(resolved)
+
+
+class MobSFClientMixin:
+    """Shared MobSF API helpers."""
+
+    base_url: str | None
+    api_key: str | None
+
+    def _configured_error(self, tool_name: str) -> ToolResult | None:
+        if self.base_url and self.api_key:
+            return None
+        return ToolResult(
+            tool_name=tool_name,
+            status=ToolStatus.VALIDATION_ERROR,
+            summary="MobSF is not configured.",
+            error="Provide MobSF URL and API key in the app before running this tool.",
+        )
+
+    def _run_static_workflow(
+        self,
+        *,
+        apk_path: Path,
+        context: ToolContext,
+        tool_name: str,
+    ) -> ToolResult:
         boundary = "----prs-mobsf-boundary"
         file_bytes = Path(apk_path).read_bytes()
         body = (
@@ -112,7 +156,7 @@ class MobSFScanTool(BaseTool):
                 encoding="utf-8",
             )
             return ToolResult(
-                tool_name=self.name,
+                tool_name=tool_name,
                 status=ToolStatus.ERROR,
                 summary="MobSF scan workflow failed.",
                 error=f"{type(exc).__name__}: {exc}",
@@ -131,7 +175,7 @@ class MobSFScanTool(BaseTool):
         if report_error:
             summary = "Completed MobSF upload and static scan. report_json failed, so scan response was saved as report."
         return ToolResult(
-            tool_name=self.name,
+            tool_name=tool_name,
             status=ToolStatus.SUCCESS,
             summary=summary,
             artifacts=[
@@ -201,3 +245,146 @@ class MobSFScanTool(BaseTool):
                 body=json.dumps(payload)[:1000],
             )
         return payload
+
+
+class MobSFSubmitTool(MobSFClientMixin, BaseTool):
+    """Start MobSF analysis in a background worker and return immediately."""
+
+    name = "mobsf_submit"
+    description = "Submit an APK to MobSF in the background so other specialist lanes can continue."
+    args_schema = {
+        "type": "object",
+        "required": ["apk_path"],
+        "properties": {
+            "apk_path": {"type": "string", "description": "Path to an APK inside the workspace."}
+        },
+    }
+
+    def __init__(self, *, base_url: str | None = None, api_key: str | None = None, store: MobSFJobStore) -> None:
+        self.base_url = base_url.rstrip("/") if base_url else None
+        self.api_key = api_key
+        self.store = store
+
+    def run(self, *, arguments: dict, context: ToolContext) -> ToolResult:
+        configured_error = self._configured_error(self.name)
+        if configured_error:
+            return configured_error
+
+        apk_path, error = resolve_workspace_file(context, arguments["apk_path"], self.name)
+        if error:
+            return error
+
+        job = self.store.create(run_id=context.run_id, apk_name=Path(apk_path).name)
+        thread = threading.Thread(
+            target=self._worker,
+            args=(job.job_id, apk_path, context),
+            name=f"prs-{job.job_id}",
+            daemon=True,
+        )
+        thread.start()
+        return ToolResult(
+            tool_name=self.name,
+            status=ToolStatus.SUCCESS,
+            summary="MobSF analysis submitted in the background.",
+            metadata={"job_id": job.job_id, "status": job.status, "apk_name": job.apk_name},
+        )
+
+    def _worker(self, job_id: str, apk_path: Path, context: ToolContext) -> None:
+        self.store.update(job_id, status="running", summary="MobSF static analysis is running.")
+        result = self._run_static_workflow(apk_path=apk_path, context=context, tool_name=self.name)
+        if result.status == ToolStatus.SUCCESS:
+            self.store.update(
+                job_id,
+                status="completed",
+                summary=result.summary,
+                artifacts=result.artifacts,
+                metadata=result.metadata,
+                hash=result.metadata.get("hash"),
+            )
+            return
+        self.store.update(
+            job_id,
+            status="failed",
+            summary=result.summary,
+            artifacts=result.artifacts,
+            metadata=result.metadata,
+            error=result.error,
+        )
+
+
+class MobSFPollTool(BaseTool):
+    """Poll or briefly wait for a background MobSF job."""
+
+    name = "mobsf_poll"
+    description = "Check the latest or specified MobSF background job and optionally wait briefly for completion."
+    args_schema = {
+        "type": "object",
+        "required": [],
+        "properties": {
+            "job_id": {"type": "string", "description": "Optional MobSF job id. Defaults to latest run job."},
+            "wait_seconds": {"type": "integer", "description": "Optional bounded wait before returning status."},
+        },
+    }
+
+    def __init__(self, *, store: MobSFJobStore) -> None:
+        self.store = store
+
+    def run(self, *, arguments: dict, context: ToolContext) -> ToolResult:
+        wait_seconds = min(int(arguments.get("wait_seconds") or 0), 60)
+        deadline = time.monotonic() + wait_seconds
+        job = self.store.get(arguments.get("job_id"), context.run_id)
+        while job and job.status in {"queued", "running"} and time.monotonic() < deadline:
+            time.sleep(1)
+            job = self.store.get(arguments.get("job_id"), context.run_id)
+
+        if not job:
+            return ToolResult(
+                tool_name=self.name,
+                status=ToolStatus.VALIDATION_ERROR,
+                summary="No MobSF background job was found for this run.",
+                error="missing_mobsf_job",
+            )
+
+        status = ToolStatus.SUCCESS if job.status == "completed" else ToolStatus.ERROR if job.status == "failed" else ToolStatus.SUCCESS
+        return ToolResult(
+            tool_name=self.name,
+            status=status,
+            summary=job.summary,
+            artifacts=job.artifacts,
+            metadata={
+                "job_id": job.job_id,
+                "job_status": job.status,
+                "hash": job.hash,
+                **job.metadata,
+            },
+            error=job.error,
+        )
+
+
+class MobSFScanTool(MobSFClientMixin, BaseTool):
+    """Upload an APK to MobSF, start static analysis, and fetch the JSON report."""
+
+    name = "mobsf_scan"
+    description = "Upload an APK to MobSF, run static analysis, and save upload/scan/report JSON artifacts."
+    args_schema = {
+        "type": "object",
+        "required": ["apk_path"],
+        "properties": {
+            "apk_path": {"type": "string", "description": "Path to an APK inside the workspace."}
+        },
+    }
+
+    def __init__(self, *, base_url: str | None = None, api_key: str | None = None) -> None:
+        self.base_url = base_url.rstrip("/") if base_url else None
+        self.api_key = api_key
+
+    def run(self, *, arguments: dict, context: ToolContext) -> ToolResult:
+        configured_error = self._configured_error(self.name)
+        if configured_error:
+            return configured_error
+
+        apk_path, error = resolve_workspace_file(context, arguments["apk_path"], self.name)
+        if error:
+            return error
+
+        return self._run_static_workflow(apk_path=apk_path, context=context, tool_name=self.name)

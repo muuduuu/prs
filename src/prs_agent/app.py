@@ -25,7 +25,10 @@ from prs_agent.tools import (
     ApktoolDecompilerTool,
     FridaTool,
     JadxDecompilerTool,
+    MobSFJobStore,
+    MobSFPollTool,
     MobSFScanTool,
+    MobSFSubmitTool,
     ReverseAnalysisPlanTool,
 )
 
@@ -134,6 +137,7 @@ class RunManager:
 def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     payload = payload or {}
     mobsf_config = payload.get("mobsf") or {}
+    mobsf_store = MobSFJobStore()
     registry = ToolRegistry()
     registry.register(ReverseAnalysisPlanTool())
     registry.register(AdbTool())
@@ -141,6 +145,14 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     registry.register(ApktoolDecompilerTool())
     registry.register(JadxDecompilerTool())
     registry.register(FridaTool())
+    registry.register(
+        MobSFSubmitTool(
+            base_url=mobsf_config.get("base_url"),
+            api_key=mobsf_config.get("api_key"),
+            store=mobsf_store,
+        )
+    )
+    registry.register(MobSFPollTool(store=mobsf_store))
     registry.register(
         MobSFScanTool(
             base_url=mobsf_config.get("base_url"),

@@ -36,7 +36,7 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
     SubagentRole(
         identifier="static_reverse",
         name="Static Reverse Analyst",
-        mission="Inspect APK structure, manifest, resources, and decompiled code for security-relevant facts.",
+        mission="Own fast APK reversing while slow scanner lanes run in parallel.",
         tool_focus=("apk_metadata", "apktool_decompile", "jadx_decompile"),
         workflow=(
             "Identify package name, version, SDK targets, permissions, and exported components.",
@@ -49,6 +49,7 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
         guardrails=(
             "Do not infer exploitability without evidence.",
             "Prefer structured parsers and artifact references over large raw excerpts.",
+            "Continue working while MobSF is queued or running.",
         ),
     ),
     SubagentRole(
@@ -72,10 +73,11 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
     SubagentRole(
         identifier="mobsf_triage",
         name="MobSF Triage Analyst",
-        mission="Use MobSF output as a triage signal and normalize it against local reverse-analysis evidence.",
-        tool_focus=("mobsf_scan",),
+        mission="Run MobSF as an asynchronous scanner lane and normalize results when ready.",
+        tool_focus=("mobsf_submit", "mobsf_poll", "mobsf_scan"),
         workflow=(
-            "Submit or reference the APK scan when MobSF is configured.",
+            "Submit the APK to MobSF as early as possible.",
+            "Poll later with bounded waits while other analysts perform local work.",
             "Extract high-signal categories such as permissions, components, network, crypto, and code warnings.",
             "Deduplicate MobSF findings against static and dynamic evidence.",
             "Flag items that require manual verification or richer parsing.",

@@ -13,7 +13,8 @@ PRS is a local, API-driven ReAct orchestrator for authorized Android application
   - `apktool`: resources and smali decompilation.
   - `jadx`: Java/Kotlin-like source decompilation.
   - `frida`: CLI readiness and USB process listing.
-  - `mobsf_scan`: APK upload to a configured MobSF server.
+  - `mobsf_submit` / `mobsf_poll`: asynchronous MobSF analysis lane.
+  - `mobsf_scan`: synchronous MobSF fallback for direct scans.
 - JSONL and final JSON traces in `runs/<run_id>/logs/` for later SFT dataset conversion.
 - Reverse-analysis subagent scaffold exposed through `reverse_analysis_plan` for
   static reverse, dynamic/device checks, MobSF triage, and report synthesis.
