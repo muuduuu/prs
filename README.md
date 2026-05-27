@@ -6,6 +6,7 @@ PRS is a local, API-driven ReAct orchestrator for authorized Android application
 
 - Local web dashboard for APK upload, Bifrost setup, model selection, MobSF config, live trace viewing, and final report output.
 - Bifrost model discovery from an OpenAI-compatible `/models` endpoint.
+- Bifrost crew mode: when the gateway is enabled, PRS runs specialist lanes for static reversing, MobSF triage, dynamic/device checks, and report synthesis.
 - Deterministic no-key planner for local smoke tests.
 - Tool registry with allow-listed wrappers for:
   - `adb`: devices, version, third-party package listing.

@@ -177,6 +177,7 @@ function renderEvent(event) {
   item.className = "event";
   const observation = event.observation || {};
   const action = event.action || {};
+  const agent = (event.labels || {}).agent || observation.agent_id || "";
   const status = observation.status || event.phase;
   const statusClass = status === "success" ? "success" : status === "error" || status === "validation_error" ? "error" : "warning";
   const summary = observation.summary || event.thought || "";
@@ -185,6 +186,7 @@ function renderEvent(event) {
       <strong>${escapeHtml(event.phase || "event")}</strong>
       <span class="badge ${statusClass}">${escapeHtml(status)}</span>
     </div>
+    ${agent ? `<div>agent: <span class="success">${escapeHtml(agent)}</span></div>` : ""}
     ${action.tool_name ? `<div>tool: <span class="success">${escapeHtml(action.tool_name)}</span></div>` : ""}
     ${summary ? `<div>${escapeHtml(summary)}</div>` : ""}
     ${observation.error ? `<div class="error">${escapeHtml(observation.error)}</div>` : ""}

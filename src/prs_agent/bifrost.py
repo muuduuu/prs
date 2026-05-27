@@ -64,10 +64,54 @@ class BifrostHTTPClient:
             "one registered tool call or a final answer. Never invent tools. "
             "Never return shell commands."
         )
+        return self._decide_with_prompt(
+            system_prompt=system_prompt,
+            objective=objective,
+            tool_schemas=tool_schemas,
+            memory=memory,
+            extra_context={},
+        )
+
+    def decide_for_role(
+        self,
+        *,
+        role_name: str,
+        mission: str,
+        objective: str,
+        tool_schemas: list[dict[str, Any]],
+        memory: list[dict[str, Any]],
+        extra_context: dict[str, Any],
+    ) -> BifrostDecision:
+        system_prompt = (
+            f"You are {role_name}, a specialist agent in an authorized mobile application "
+            f"security assessment crew. Mission: {mission} Return only strict JSON. "
+            "Use only the registered tools provided to your lane. Never invent tools. "
+            "Never return shell commands. Prefer bounded evidence collection. "
+            "If your lane is complete, blocked, or has no useful next tool, return type=final. "
+            "Do not loop on the same failing action."
+        )
+        return self._decide_with_prompt(
+            system_prompt=system_prompt,
+            objective=objective,
+            tool_schemas=tool_schemas,
+            memory=memory,
+            extra_context=extra_context,
+        )
+
+    def _decide_with_prompt(
+        self,
+        *,
+        system_prompt: str,
+        objective: str,
+        tool_schemas: list[dict[str, Any]],
+        memory: list[dict[str, Any]],
+        extra_context: dict[str, Any],
+    ) -> BifrostDecision:
         user_payload = {
             "objective": objective,
             "available_tools": tool_schemas,
             "recent_memory": memory,
+            "context": extra_context,
             "response_schema": {
                 "tool_call": {
                     "type": "tool_call",

@@ -19,8 +19,10 @@ class ToolRegistry:
             raise ValueError(f"Tool already registered: {tool.name}")
         self._tools[tool.name] = tool
 
-    def list_schemas(self) -> list[dict[str, Any]]:
-        return [tool.schema_for_model() for tool in self._tools.values()]
+    def list_schemas(self, tool_names: set[str] | None = None) -> list[dict[str, Any]]:
+        if tool_names is None:
+            return [tool.schema_for_model() for tool in self._tools.values()]
+        return [tool.schema_for_model() for name, tool in self._tools.items() if name in tool_names]
 
     def execute(
         self,
@@ -58,4 +60,3 @@ class ToolRegistry:
                 summary="Tool wrapper raised an unhandled exception.",
                 error=f"{type(exc).__name__}: {exc}",
             )
-

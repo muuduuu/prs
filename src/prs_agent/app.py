@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 from prs_agent.bifrost import AssessmentPlannerClient, BifrostHTTPClient, fetch_bifrost_models
 from prs_agent.contracts import AgentRunResult, new_run_id, utc_now_iso
+from prs_agent.crew import CrewConfig, CrewOrchestrator
 from prs_agent.orchestrator import AgentOrchestrator
 from prs_agent.registry import ToolRegistry
 from prs_agent.subagents import specialist_manifest
@@ -92,14 +93,28 @@ class RunManager:
         try:
             registry = build_registry(payload)
             bifrost = build_bifrost(payload)
-            orchestrator = AgentOrchestrator(
-                bifrost=bifrost,
-                registry=registry,
-                workspace_dir=self.workspace_dir,
-                max_iterations=int(payload.get("max_iterations") or 8),
-                tool_timeout_seconds=int(payload.get("tool_timeout_seconds") or 120),
-                on_event=lambda event: self._append_event(managed.run_id, event),
-            )
+            if (payload.get("bifrost") or {}).get("enabled"):
+                orchestrator = CrewOrchestrator(
+                    bifrost=bifrost,
+                    registry=registry,
+                    workspace_dir=self.workspace_dir,
+                    config=CrewConfig(
+                        apk_path=payload.get("apk_path"),
+                        include_device_checks=bool(payload.get("include_device_checks", True)),
+                        max_steps_per_agent=int(payload.get("max_steps_per_agent") or 6),
+                    ),
+                    tool_timeout_seconds=int(payload.get("tool_timeout_seconds") or 120),
+                    on_event=lambda event: self._append_event(managed.run_id, event),
+                )
+            else:
+                orchestrator = AgentOrchestrator(
+                    bifrost=bifrost,
+                    registry=registry,
+                    workspace_dir=self.workspace_dir,
+                    max_iterations=int(payload.get("max_iterations") or 12),
+                    tool_timeout_seconds=int(payload.get("tool_timeout_seconds") or 120),
+                    on_event=lambda event: self._append_event(managed.run_id, event),
+                )
             result = orchestrator.run(managed.objective, run_id=managed.run_id)
             self._finish(managed.run_id, result)
         except Exception as exc:

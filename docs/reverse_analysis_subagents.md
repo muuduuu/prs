@@ -1,8 +1,10 @@
 # Reverse-Analysis Subagents
 
 This scaffold gives PRS a set of bounded specialist lanes without giving the
-model direct shell or device control. The orchestrator still executes only
-registered tools with validated arguments.
+model direct shell or device control. When Bifrost is enabled, PRS runs these as
+separate specialist lanes with role prompts, restricted toolsets, and independent
+memory. The orchestrator still executes only registered tools with validated
+arguments.
 
 ## Roles
 
