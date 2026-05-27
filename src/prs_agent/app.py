@@ -236,27 +236,6 @@ class AppHandler(BaseHTTPRequestHandler):
             },
         )
 
-    def _handle_bifrost_models(self) -> None:
-        payload = self._read_json()
-        gateway_url = payload.get("gateway_url")
-        api_key = payload.get("api_key")
-        if not gateway_url or not api_key:
-            self._json({"error": "gateway_url and api_key are required"}, status=HTTPStatus.BAD_REQUEST)
-            return
-
-        try:
-            models = fetch_bifrost_models(
-                gateway_url=gateway_url,
-                api_key=api_key,
-                models_url=payload.get("models_url") or None,
-            )
-        except Exception as exc:
-            self._json(
-                {"error": f"Unable to fetch models: {type(exc).__name__}: {exc}"},
-                status=HTTPStatus.BAD_GATEWAY,
-            )
-            return
-        self._json({"models": models})
         file_item = form["apk"] if "apk" in form else None
         if file_item is None or not file_item.filename:
             self._json({"error": "missing apk file"}, status=HTTPStatus.BAD_REQUEST)
@@ -281,6 +260,28 @@ class AppHandler(BaseHTTPRequestHandler):
             },
             status=HTTPStatus.CREATED,
         )
+
+    def _handle_bifrost_models(self) -> None:
+        payload = self._read_json()
+        gateway_url = payload.get("gateway_url")
+        api_key = payload.get("api_key")
+        if not gateway_url or not api_key:
+            self._json({"error": "gateway_url and api_key are required"}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        try:
+            models = fetch_bifrost_models(
+                gateway_url=gateway_url,
+                api_key=api_key,
+                models_url=payload.get("models_url") or None,
+            )
+        except Exception as exc:
+            self._json(
+                {"error": f"Unable to fetch models: {type(exc).__name__}: {exc}"},
+                status=HTTPStatus.BAD_GATEWAY,
+            )
+            return
+        self._json({"models": models})
 
     def _static(self, request_path: str) -> None:
         if request_path in ("", "/"):
