@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from prs_agent.baseline import BaselineAssessmentRunner
 from prs_agent.bifrost import BifrostClient
 from prs_agent.context import MemoryBuffer, compact_tool_result
 from prs_agent.contracts import AgentRunResult, BifrostDecision, ToolContext, new_run_id
@@ -69,8 +70,16 @@ class CrewOrchestrator:
             labels={"success": True, "requires_human_review": False},
         )
 
+        baseline_result = BaselineAssessmentRunner(
+            registry=self.registry,
+            context=context,
+            logger=logger,
+            apk_path=self.config.apk_path,
+            include_device_checks=self.config.include_device_checks,
+        ).run(objective)
+
         roles = [role for role in REVERSE_ANALYSIS_SUBAGENTS if self._role_enabled(role.identifier)]
-        lane_results: list[dict[str, Any]] = []
+        lane_results: list[dict[str, Any]] = [baseline_result]
         primary_roles = [
             role
             for role in roles
@@ -84,7 +93,7 @@ class CrewOrchestrator:
 
         with ThreadPoolExecutor(max_workers=max(1, len(primary_roles))) as executor:
             futures = {
-                executor.submit(self._run_lane, role, objective, context, logger, []): role.identifier
+                executor.submit(self._run_lane, role, objective, context, logger, [baseline_result]): role.identifier
                 for role in primary_roles
             }
             for future in as_completed(futures):

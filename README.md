@@ -6,7 +6,10 @@ PRS is a local, API-driven ReAct orchestrator for authorized Android application
 
 - Local web dashboard for APK upload, Bifrost setup, model selection, MobSF config, live trace viewing, and final report output.
 - Bifrost model discovery from an OpenAI-compatible `/models` endpoint.
-- Bifrost crew mode: when the gateway is enabled, PRS runs specialist lanes for static reversing, MobSF triage, dynamic/device checks, secrets/WebView review, exploitability validation, and report synthesis.
+- Bifrost crew mode: when the gateway is enabled, PRS first runs a deterministic
+  baseline pipeline that executes the core APK assessment tools, then runs
+  specialist lanes for static reversing, MobSF triage, dynamic/device checks,
+  secrets/WebView review, exploitability validation, and report synthesis.
 - Deterministic no-key planner for local smoke tests.
 - Tool registry with allow-listed wrappers for:
   - `adb`: devices, version, third-party package listing.
@@ -44,6 +47,13 @@ does not generate weaponized payloads or autonomous compromise workflows. It
 does produce the pieces a pentester needs: linked findings, preconditions,
 confirmed versus hypothetical chain state, CWE names, approximate CVSS scores,
 bounded validation steps, evidence references, and remediation priorities.
+
+The baseline pipeline is intentionally model-independent: for a provided APK it
+submits MobSF if configured, extracts metadata, analyzes the manifest, runs
+apktool/JADX, audits Network Security Config, inventories dependencies and
+source artifacts, scans secrets, audits WebViews, compiles findings, verifies
+bounded exploitability where possible, and builds attack-path chains. Missing
+local tools become structured blocked observations instead of stopping the run.
 
 ## Run Locally
 

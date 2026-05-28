@@ -3,8 +3,12 @@
 This scaffold gives PRS a set of bounded specialist lanes without giving the
 model direct shell or device control. When Bifrost is enabled, PRS runs these as
 separate specialist lanes with role prompts, restricted toolsets, and independent
-memory. The orchestrator still executes only registered tools with validated
-arguments.
+memory. Before those model-guided lanes run, PRS executes a deterministic
+baseline pipeline over the uploaded APK: MobSF submit/poll when configured,
+metadata, manifest findings, apktool/JADX, Network Security Config audit,
+dependency inventory, source inventory, secret scan, WebView audit, finding
+compile, bounded exploitability verification, and attack-path chaining. The
+orchestrator still executes only registered tools with validated arguments.
 
 ## Roles
 
@@ -37,14 +41,14 @@ guardrails as metadata. It is intentionally non-invasive: it does not run
 reverse-engineering commands, call MobSF, or alter device state. Bifrost can use
 the returned plan to decide which existing bounded tool to call next.
 
-In Bifrost crew mode, PRS starts static reverse, MobSF triage, and dynamic
-device readiness as parallel primary lanes. It then starts dependent
-secrets/WebView and exploitability validation lanes after primary artifacts and
-findings have had a chance to land. The validation lane then builds CWE/CVSS
-enriched attack paths that connect findings into realistic chains with
-preconditions, confidence, impact, bounded validation steps, and remediation.
-This keeps slow MobSF work asynchronous while avoiding source-scanner races
-against missing decompiler output.
+In Bifrost crew mode, PRS first runs the deterministic baseline so real tool
+execution does not depend on the LLM making every obvious decision. It then
+starts static reverse, MobSF triage, and dynamic device readiness as parallel
+primary lanes with the baseline output in context. Dependent secrets/WebView
+and exploitability validation lanes run after primary artifacts and findings
+have had a chance to land. The validation lane then builds CWE/CVSS enriched
+attack paths that connect findings into realistic chains with preconditions,
+confidence, impact, bounded validation steps, and remediation.
 
 ## Docker
 
