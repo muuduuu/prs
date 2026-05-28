@@ -117,7 +117,7 @@ class RunManager:
                         include_device_checks=bool(payload.get("include_device_checks", True)),
                         max_steps_per_agent=int(payload.get("max_steps_per_agent") or 6),
                     ),
-                    tool_timeout_seconds=int(payload.get("tool_timeout_seconds") or 120),
+                    tool_timeout_seconds=int(payload.get("tool_timeout_seconds") or 300),
                     on_event=lambda event: self._append_event(managed.run_id, event),
                 )
             else:
@@ -126,7 +126,7 @@ class RunManager:
                     registry=registry,
                     workspace_dir=self.workspace_dir,
                     max_iterations=int(payload.get("max_iterations") or 12),
-                    tool_timeout_seconds=int(payload.get("tool_timeout_seconds") or 120),
+                    tool_timeout_seconds=int(payload.get("tool_timeout_seconds") or 300),
                     on_event=lambda event: self._append_event(managed.run_id, event),
                 )
             result = orchestrator.run(managed.objective, run_id=managed.run_id)

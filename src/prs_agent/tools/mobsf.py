@@ -126,17 +126,11 @@ class MobSFClientMixin:
                 },
                 context.timeout_seconds,
             )
-            try:
-                report_payload = self._post_form(
-                    "/api/v1/report_json",
-                    {"hash": scan_hash},
-                    context.timeout_seconds,
-                )
-                if str(report_payload.get("report", "")).lower() == "report not found":
-                    report_error = "MobSF report_json returned Report not Found; using scan response as report."
-                    report_payload = scan_payload
-            except MobSFAPIError as exc:
-                report_error = f"{exc} Body: {exc.body[:500]}"
+            report_payload, report_error = self._fetch_report_json_with_retries(
+                scan_hash=scan_hash,
+                timeout_seconds=context.timeout_seconds,
+            )
+            if not report_payload:
                 report_payload = scan_payload
         except Exception as exc:
             error_dir = context.artifacts_dir / "mobsf"
@@ -173,7 +167,7 @@ class MobSFClientMixin:
         report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
         summary = "Completed MobSF upload, static scan, and JSON report retrieval."
         if report_error:
-            summary = "Completed MobSF upload and static scan. report_json failed, so scan response was saved as report."
+            summary = "Completed MobSF upload and static scan. report_json was not ready before the wait budget ended, so scan response was saved as report."
         return ToolResult(
             tool_name=tool_name,
             status=ToolStatus.SUCCESS,
@@ -185,6 +179,44 @@ class MobSFClientMixin:
             ],
             metadata={"hash": upload_payload.get("hash"), "report_json_error": report_error},
         )
+
+    def _fetch_report_json_with_retries(
+        self,
+        *,
+        scan_hash: str,
+        timeout_seconds: int,
+    ) -> tuple[dict[str, Any], str | None]:
+        """Wait for MobSF's report_json endpoint to become ready.
+
+        MobSF often returns from `/scan` before the JSON report is readable.
+        Treat "Report not Found" and transient report_json failures as a
+        not-ready state until the bounded wait budget is exhausted.
+        """
+
+        wait_budget = max(60, min(timeout_seconds, 600))
+        per_request_timeout = max(15, min(timeout_seconds, 90))
+        deadline = time.monotonic() + wait_budget
+        attempt = 0
+        last_error: str | None = None
+
+        while time.monotonic() < deadline:
+            attempt += 1
+            try:
+                payload = self._post_form(
+                    "/api/v1/report_json",
+                    {"hash": scan_hash},
+                    per_request_timeout,
+                )
+                if str(payload.get("report", "")).lower() != "report not found":
+                    payload["_prs_report_attempts"] = attempt
+                    payload["_prs_report_wait_seconds"] = wait_budget
+                    return payload, None
+                last_error = "MobSF report_json returned Report not Found."
+            except MobSFAPIError as exc:
+                last_error = f"{exc} Body: {exc.body[:500]}"
+            time.sleep(5)
+
+        return {}, f"{last_error or 'MobSF report_json was not ready.'} Waited up to {wait_budget}s."
 
     def _upload(self, body: bytes, boundary: str, timeout_seconds: int) -> dict:
         request = urllib.request.Request(
@@ -316,13 +348,13 @@ class MobSFPollTool(BaseTool):
     """Poll or briefly wait for a background MobSF job."""
 
     name = "mobsf_poll"
-    description = "Check the latest or specified MobSF background job and optionally wait briefly for completion."
+    description = "Check the latest or specified MobSF background job and optionally wait for completion."
     args_schema = {
         "type": "object",
         "required": [],
         "properties": {
             "job_id": {"type": "string", "description": "Optional MobSF job id. Defaults to latest run job."},
-            "wait_seconds": {"type": "integer", "description": "Optional bounded wait before returning status."},
+            "wait_seconds": {"type": "integer", "description": "Optional bounded wait before returning status. Max 600."},
         },
     }
 
@@ -330,7 +362,7 @@ class MobSFPollTool(BaseTool):
         self.store = store
 
     def run(self, *, arguments: dict, context: ToolContext) -> ToolResult:
-        wait_seconds = min(int(arguments.get("wait_seconds") or 0), 60)
+        wait_seconds = min(int(arguments.get("wait_seconds") or 0), 600)
         deadline = time.monotonic() + wait_seconds
         job = self.store.get(arguments.get("job_id"), context.run_id)
         while job and job.status in {"queued", "running"} and time.monotonic() < deadline:

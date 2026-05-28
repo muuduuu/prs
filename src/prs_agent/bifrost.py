@@ -596,8 +596,8 @@ class AssessmentPlannerClient:
                 plan.append(
                     (
                         "mobsf_poll",
-                        "Check whether the MobSF specialist lane has finished and collect its artifacts.",
-                        {"wait_seconds": 20},
+                        "Wait for the MobSF specialist lane to finish and collect its artifacts.",
+                        {"wait_seconds": 240},
                     )
                 )
             elif "mobsf_scan" in available:

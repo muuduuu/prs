@@ -109,8 +109,8 @@ class BaselineAssessmentRunner:
 
         poll = self._execute(
             "mobsf_poll",
-            {"wait_seconds": 45},
-            "Poll MobSF for scanner results after local reverse work.",
+            {"wait_seconds": 240},
+            "Poll MobSF patiently for scanner results after local reverse work.",
         )
         for artifact in poll.artifacts:
             if artifact.kind == "json" and "report" in artifact.description.lower():
