@@ -12,8 +12,12 @@ PRS is a local, API-driven ReAct orchestrator for authorized Android application
   - `adb`: devices, version, third-party package listing.
   - `apk_metadata`: APK package metadata via `pyaxmlparser`, with `aapt` fallback when available.
   - `manifest_findings`: manifest risk findings for debug flags, backups, cleartext, exported components, permissions, SDK levels, and network security config.
+  - `network_security_audit`: Network Security Config parser for cleartext
+    domains, trust anchors, debug overrides, and certificate pinning posture.
   - `apktool`: resources and smali decompilation.
   - `jadx`: Java/Kotlin-like source decompilation.
+  - `dependency_inventory`: SDK, package namespace, Gradle coordinate, and
+    native `.so` inventory for supply-chain and native attack-surface review.
   - `source_inventory`: broad search across decompiled output for URLs,
     endpoints, deeplinks, Firebase/S3 hints, GraphQL, storage APIs, crypto APIs,
     auth/token references, native libraries, and IPC usage.

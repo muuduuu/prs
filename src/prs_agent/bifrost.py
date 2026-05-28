@@ -462,7 +462,23 @@ class AssessmentPlannerClient:
                     )
                 )
                 apktool_dir = self._artifact_dir("apktool")
-                if apktool_dir and "secret_scan" in available:
+                if apktool_dir:
+                    if "network_security_audit" in available:
+                        plan.append(
+                            (
+                                "network_security_audit",
+                                "Audit Android Network Security Config from apktool resources.",
+                                {"apktool_dir": apktool_dir},
+                            )
+                        )
+                    if "dependency_inventory" in available:
+                        plan.append(
+                            (
+                                "dependency_inventory",
+                                "Inventory SDKs, package namespaces, Gradle coordinates, and native libraries from apktool output.",
+                                {"source_dir": apktool_dir},
+                            )
+                        )
                     if "source_inventory" in available:
                         plan.append(
                             (
@@ -471,13 +487,14 @@ class AssessmentPlannerClient:
                                 {"source_dir": apktool_dir},
                             )
                         )
-                    plan.append(
-                        (
-                            "secret_scan",
-                            "Scan apktool output for embedded secrets and risky strings.",
-                            {"source_dir": apktool_dir},
+                    if "secret_scan" in available:
+                        plan.append(
+                            (
+                                "secret_scan",
+                                "Scan apktool output for embedded secrets and risky strings.",
+                                {"source_dir": apktool_dir},
+                            )
                         )
-                    )
             if "jadx_decompile" in available:
                 plan.append(
                     (
@@ -488,6 +505,14 @@ class AssessmentPlannerClient:
                 )
                 jadx_dir = self._artifact_dir("jadx")
                 if jadx_dir:
+                    if "dependency_inventory" in available:
+                        plan.append(
+                            (
+                                "dependency_inventory",
+                                "Inventory SDKs and namespaces from JADX sources.",
+                                {"source_dir": jadx_dir},
+                            )
+                        )
                     if "source_inventory" in available:
                         plan.append(
                             (

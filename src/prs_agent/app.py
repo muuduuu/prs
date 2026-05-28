@@ -25,6 +25,7 @@ from prs_agent.tools import (
     ApkMetadataTool,
     ApktoolDecompilerTool,
     BackupAuditTool,
+    DependencyInventoryTool,
     EmulatorTool,
     ExploitChainTool,
     ExploitVerifyTool,
@@ -39,6 +40,7 @@ from prs_agent.tools import (
     MobSFPollTool,
     MobSFScanTool,
     MobSFSubmitTool,
+    NetworkSecurityAuditTool,
     ReverseAnalysisPlanTool,
     SecretScanTool,
     SourceInventoryTool,
@@ -171,7 +173,9 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     registry.register(ApkMetadataTool())
     registry.register(ManifestFindingsTool())
     registry.register(ApktoolDecompilerTool())
+    registry.register(NetworkSecurityAuditTool())
     registry.register(JadxDecompilerTool())
+    registry.register(DependencyInventoryTool())
     registry.register(SourceInventoryTool())
     registry.register(SecretScanTool())
     registry.register(WebViewAuditTool())
@@ -214,8 +218,10 @@ def build_bifrost(payload: dict[str, Any], run_id: str | None = None):
         "analysis_tools": [
             "apk_metadata",
             "manifest_findings",
+            "network_security_audit",
             "apktool_decompile",
             "jadx_decompile",
+            "dependency_inventory",
             "source_inventory",
             "secret_scan",
             "webview_audit",

@@ -5,6 +5,7 @@ from prs_agent.tools.apk_metadata import ApkMetadataTool
 from prs_agent.tools.apktool import ApktoolDecompilerTool
 from prs_agent.tools.backup_audit import BackupAuditTool
 from prs_agent.tools.base import BaseTool
+from prs_agent.tools.dependency_inventory import DependencyInventoryTool
 from prs_agent.tools.emulator import EmulatorTool
 from prs_agent.tools.exploit_chain import ExploitChainTool
 from prs_agent.tools.exploit_verify import ExploitVerifyTool
@@ -16,6 +17,7 @@ from prs_agent.tools.jadx import JadxDecompilerTool
 from prs_agent.tools.manifest_findings import ManifestFindingsTool
 from prs_agent.tools.mobsf import MobSFJobStore, MobSFPollTool, MobSFScanTool, MobSFSubmitTool
 from prs_agent.tools.mobsf_findings import MobSFFindingsTool
+from prs_agent.tools.network_security_audit import NetworkSecurityAuditTool
 from prs_agent.tools.secret_scan import SecretScanTool
 from prs_agent.tools.source_inventory import SourceInventoryTool
 from prs_agent.tools.subagents import ReverseAnalysisPlanTool
@@ -27,6 +29,7 @@ __all__ = [
     "ApktoolDecompilerTool",
     "BackupAuditTool",
     "BaseTool",
+    "DependencyInventoryTool",
     "EmulatorTool",
     "ExploitChainTool",
     "ExploitVerifyTool",
@@ -41,6 +44,7 @@ __all__ = [
     "MobSFPollTool",
     "MobSFScanTool",
     "MobSFSubmitTool",
+    "NetworkSecurityAuditTool",
     "ReverseAnalysisPlanTool",
     "SecretScanTool",
     "SourceInventoryTool",

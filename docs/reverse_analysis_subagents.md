@@ -9,8 +9,10 @@ arguments.
 ## Roles
 
 - `static_reverse`: inspects APK metadata, manifests, resources, and decompiled
-  code using `apk_metadata`, `manifest_findings`, `apktool_decompile`, and
-  `jadx_decompile`.
+  code using `apk_metadata`, `manifest_findings`, `network_security_audit`,
+  `apktool_decompile`, `jadx_decompile`, and `dependency_inventory`.
+  This lane now records Network Security Config posture plus SDK, namespace,
+  Gradle coordinate, and native library inventory.
 - `secret_webview`: consumes decompiled source directories and emits focused
   findings from `source_inventory`, `secret_scan`, and `webview_audit` with
   redacted evidence. This lane inventories URLs, endpoints, deeplinks, cloud

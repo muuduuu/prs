@@ -37,15 +37,23 @@ REVERSE_ANALYSIS_SUBAGENTS: tuple[SubagentRole, ...] = (
         identifier="static_reverse",
         name="Static Reverse Analyst",
         mission="Own fast APK reversing while slow scanner lanes run in parallel.",
-        tool_focus=("apk_metadata", "manifest_findings", "apktool_decompile", "jadx_decompile"),
+        tool_focus=(
+            "apk_metadata",
+            "manifest_findings",
+            "network_security_audit",
+            "apktool_decompile",
+            "jadx_decompile",
+            "dependency_inventory",
+        ),
         workflow=(
             "Identify package name, version, SDK targets, permissions, and exported components.",
             "Review manifests, resources, network security config, and deep link declarations.",
+            "Inventory dependencies, SDKs, package namespaces, and native libraries that affect supply-chain and native attack surface.",
             "Inspect decompiled code for hardcoded secrets, risky crypto, WebView exposure, storage misuse, and trust decisions.",
             "Record evidence paths and confidence for each candidate finding.",
         ),
         inputs=("apk_path", "apk_metadata output", "apktool artifacts", "jadx artifacts"),
-        outputs=("static inventory", "candidate static findings", "artifact index"),
+        outputs=("static inventory", "network security findings", "dependency inventory", "candidate static findings", "artifact index"),
         guardrails=(
             "Do not infer exploitability without evidence.",
             "Prefer structured parsers and artifact references over large raw excerpts.",
@@ -196,7 +204,7 @@ def build_reverse_analysis_plan(
             {
                 "from": "static_reverse",
                 "to": "secret_webview",
-                "payload": "jadx/apktool output paths for source-level secret and WebView analysis",
+                "payload": "jadx/apktool output paths plus dependency and network-security context for source-level analysis",
                 "enabled": True,
             },
             {
