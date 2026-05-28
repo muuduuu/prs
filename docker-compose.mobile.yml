@@ -1,0 +1,26 @@
+services:
+  prs-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.mobile
+    ports:
+      - "8787:8787"
+    environment:
+      PRS_MOBSF_URL: "http://mobsf:8000"
+      PRS_MOBSF_API_KEY: "${PRS_MOBSF_API_KEY:-}"
+      PRS_RUNTIME_PROFILE: "mobile-toolbox"
+    volumes:
+      - ./runs:/app/runs
+      - ./uploads:/app/uploads
+    depends_on:
+      - mobsf
+
+  mobsf:
+    image: opensecurity/mobile-security-framework-mobsf:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - mobsf-data:/home/mobsf/.MobSF
+
+volumes:
+  mobsf-data:

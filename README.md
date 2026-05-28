@@ -87,6 +87,17 @@ Use `http://mobsf:8000` from inside Docker Compose. If you run PRS directly on y
 
 See `docs/reverse_analysis_subagents.md` for the subagent scaffold and Docker notes.
 
+For a fuller mobile assessment toolbox inspired by sandboxed agent runners like
+Strix, use the mobile compose profile:
+
+```bash
+docker compose -f docker-compose.mobile.yml up --build
+```
+
+This builds `Dockerfile.mobile` with apktool, JADX, ADB, Frida tools,
+Objection, Semgrep, Java, and support utilities, alongside MobSF. See
+`docs/mobile_tool_runtime.md`.
+
 If you do not install the package, run directly:
 
 ```bash

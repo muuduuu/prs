@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import cgi
 import json
+import os
 import shutil
 import threading
 import traceback
@@ -166,6 +167,8 @@ class RunManager:
 def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     payload = payload or {}
     mobsf_config = payload.get("mobsf") or {}
+    mobsf_base_url = mobsf_config.get("base_url") or os.getenv("PRS_MOBSF_URL")
+    mobsf_api_key = mobsf_config.get("api_key") or os.getenv("PRS_MOBSF_API_KEY")
     mobsf_store = MobSFJobStore()
     registry = ToolRegistry()
     registry.register(ReverseAnalysisPlanTool())
@@ -186,16 +189,16 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
     registry.register(FridaProbeTool())
     registry.register(
         MobSFSubmitTool(
-            base_url=mobsf_config.get("base_url"),
-            api_key=mobsf_config.get("api_key"),
+            base_url=mobsf_base_url,
+            api_key=mobsf_api_key,
             store=mobsf_store,
         )
     )
     registry.register(MobSFPollTool(store=mobsf_store))
     registry.register(
         MobSFScanTool(
-            base_url=mobsf_config.get("base_url"),
-            api_key=mobsf_config.get("api_key"),
+            base_url=mobsf_base_url,
+            api_key=mobsf_api_key,
         )
     )
     registry.register(MobSFFindingsTool())
@@ -208,13 +211,15 @@ def build_registry(payload: dict[str, Any] | None = None) -> ToolRegistry:
 def build_bifrost(payload: dict[str, Any], run_id: str | None = None):
     bifrost_config = payload.get("bifrost") or {}
     mobsf_config = payload.get("mobsf") or {}
+    mobsf_base_url = mobsf_config.get("base_url") or os.getenv("PRS_MOBSF_URL")
+    mobsf_api_key = mobsf_config.get("api_key") or os.getenv("PRS_MOBSF_API_KEY")
     apk_stem = Path(payload["apk_path"]).stem if payload.get("apk_path") else "<apk_stem>"
     context_hints = {
         "apk_path": payload.get("apk_path"),
         "run_id": run_id,
         "include_device_checks": bool(payload.get("include_device_checks", True)),
-        "mobsf_configured": bool(mobsf_config.get("base_url") and mobsf_config.get("api_key")),
-        "mobsf_url": mobsf_config.get("base_url"),
+        "mobsf_configured": bool(mobsf_base_url and mobsf_api_key),
+        "mobsf_url": mobsf_base_url,
         "analysis_tools": [
             "apk_metadata",
             "manifest_findings",
@@ -267,6 +272,9 @@ def tool_health() -> dict[str, Any]:
         "emulator": {"available": shutil.which("emulator") is not None, "path": shutil.which("emulator")},
         "frida": {"available": shutil.which("frida") is not None, "path": shutil.which("frida")},
         "frida-ps": {"available": shutil.which("frida-ps") is not None, "path": shutil.which("frida-ps")},
+        "objection": {"available": shutil.which("objection") is not None, "path": shutil.which("objection")},
+        "semgrep": {"available": shutil.which("semgrep") is not None, "path": shutil.which("semgrep")},
+        "runtime_profile": {"available": True, "path": os.getenv("PRS_RUNTIME_PROFILE", "host")},
     }
 
 

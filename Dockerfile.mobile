@@ -1,0 +1,66 @@
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PRS_RUNTIME_PROFILE=mobile-toolbox
+ENV PATH="/opt/jadx/bin:${PATH}"
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        adb \
+        aapt \
+        apktool \
+        binutils \
+        ca-certificates \
+        curl \
+        default-jre-headless \
+        file \
+        git \
+        iproute2 \
+        openssl \
+        unzip \
+        wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python - <<'PY'
+import json
+import shutil
+import urllib.request
+import zipfile
+from pathlib import Path
+
+api = "https://api.github.com/repos/skylot/jadx/releases/latest"
+release = json.load(urllib.request.urlopen(api, timeout=60))
+asset = next(
+    item for item in release["assets"]
+    if item["name"].startswith("jadx-") and item["name"].endswith(".zip")
+)
+archive = Path("/tmp/jadx.zip")
+archive.write_bytes(urllib.request.urlopen(asset["browser_download_url"], timeout=180).read())
+target = Path("/opt/jadx")
+target.mkdir(parents=True, exist_ok=True)
+with zipfile.ZipFile(archive) as zf:
+    zf.extractall(target)
+bin_dir = next(target.glob("*/bin"), None)
+if bin_dir and bin_dir != target / "bin":
+    shutil.copytree(bin_dir, target / "bin", dirs_exist_ok=True)
+archive.unlink(missing_ok=True)
+PY
+
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir \
+        frida-tools \
+        objection \
+        semgrep
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+
+RUN python -m pip install --no-cache-dir -e .
+
+EXPOSE 8787
+
+CMD ["python", "-c", "from prs_agent.app import serve; serve(host='0.0.0.0')"]
