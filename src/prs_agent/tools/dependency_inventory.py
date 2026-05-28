@@ -30,7 +30,40 @@ SDK_PATTERNS: tuple[tuple[str, str, str], ...] = (
     ("Flutter", r"\bio\.flutter\b|libflutter\.so", "framework"),
     ("Cordova", r"\borg\.apache\.cordova\b|cordova\.js", "framework"),
     ("Unity", r"\bcom\.unity3d\b|libunity\.so", "game"),
+    ("Chucker HTTP Inspector", r"\bcom\.chuckerteam\.chucker\b|ChuckerInterceptor|chucker_library", "debug_tooling"),
+    ("Flipper", r"\bcom\.facebook\.flipper\b|SoLoader\.init|FlipperClient", "debug_tooling"),
+    ("Stetho", r"\bcom\.facebook\.stetho\b|Stetho\.initialize", "debug_tooling"),
+    ("LeakCanary", r"\bleakcanary\b|LeakCanary\.install", "debug_tooling"),
+    ("StrictMode", r"\bStrictMode\.setThreadPolicy\b|\bStrictMode\.setVmPolicy\b", "debug_tooling"),
 )
+
+
+RELEASE_DEBUG_TOOLING = {
+    "Chucker HTTP Inspector": {
+        "severity": "high",
+        "cwe": "CWE-489",
+        "description": (
+            "Chucker is an in-app HTTP inspector. In a release fintech/mobile banking build it can expose "
+            "request and response metadata, headers, tokens, PII, and backend behavior to local users or "
+            "anyone with app/device access."
+        ),
+    },
+    "Flipper": {
+        "severity": "medium",
+        "cwe": "CWE-489",
+        "description": "Flipper is a debug inspection framework and should not be active in release builds.",
+    },
+    "Stetho": {
+        "severity": "medium",
+        "cwe": "CWE-489",
+        "description": "Stetho exposes debug inspection capabilities and should not be active in release builds.",
+    },
+    "LeakCanary": {
+        "severity": "medium",
+        "cwe": "CWE-489",
+        "description": "LeakCanary is a debug memory-leak tool and should not ship in release builds.",
+    },
+}
 
 
 SOURCE_SUFFIXES = {".java", ".kt", ".smali", ".xml", ".json", ".properties", ".gradle"}
@@ -198,6 +231,24 @@ def _findings(
                 evidence={"sdks": sorted(sdk_hits.values(), key=lambda item: item["name"])},
             )
         )
+    debug_tooling = [
+        sdk
+        for sdk in sorted(sdk_hits.values(), key=lambda item: item["name"])
+        if sdk["name"] in RELEASE_DEBUG_TOOLING
+    ]
+    for sdk in debug_tooling:
+        meta = RELEASE_DEBUG_TOOLING[sdk["name"]]
+        findings.append(
+            _finding(
+                finding_id=f"DEP-RELEASE-DEBUG-TOOL-{_slug(sdk['name'])}",
+                title=f"{sdk['name']} appears to be present in the release APK",
+                severity=meta["severity"],
+                category="debug_tooling",
+                description=meta["description"],
+                evidence={"tool": sdk["name"], "files": sdk["files"][:20]},
+                cwe=meta["cwe"],
+            )
+        )
     if native_libs:
         findings.append(
             _finding(
@@ -236,6 +287,10 @@ def _findings(
             )
         )
     return findings
+
+
+def _slug(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "-" for ch in value).strip("-").upper()
 
 
 def _finding(
