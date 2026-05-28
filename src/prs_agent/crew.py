@@ -88,7 +88,7 @@ class CrewOrchestrator:
                 for role in primary_roles
             }
             for future in as_completed(futures):
-                lane_results.append(future.result())
+                lane_results.append(self._lane_result_or_error(future, futures[future]))
 
         if dependent_roles:
             with ThreadPoolExecutor(max_workers=max(1, len(dependent_roles))) as executor:
@@ -97,7 +97,7 @@ class CrewOrchestrator:
                     for role in dependent_roles
                 }
                 for future in as_completed(futures):
-                    lane_results.append(future.result())
+                    lane_results.append(self._lane_result_or_error(future, futures[future]))
 
         final_answer = self._synthesize_report(objective, lane_results)
         logger.event(
@@ -155,7 +155,20 @@ class CrewOrchestrator:
             tool_names.update({"finding_compile", "exploit_chain"})
 
         for _ in range(self.config.max_steps_per_agent):
-            decision = self._decide_for_role(role, objective, tool_names, memory.snapshot(), lane_context)
+            try:
+                decision = self._decide_for_role(role, objective, tool_names, memory.snapshot(), lane_context)
+            except Exception as exc:
+                final = {
+                    "summary": f"{role.name} lane stopped because Bifrost decision failed.",
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "blocked_prerequisites": ["Bifrost gateway decision failed for this specialist lane."],
+                }
+                logger.event(
+                    phase="agent_error",
+                    observation=final,
+                    labels={"success": False, "agent": role.identifier, "error_category": "bifrost_decision_error"},
+                )
+                break
             if decision.type == "final":
                 final = decision.answer or {"summary": decision.thought}
                 logger.event(
@@ -201,6 +214,21 @@ class CrewOrchestrator:
                 "memory": memory.snapshot(),
             }
         return {"agent": role.identifier, "name": role.name, "result": final, "memory": memory.snapshot()}
+
+    def _lane_result_or_error(self, future, role_id: str) -> dict[str, Any]:
+        try:
+            return future.result()
+        except Exception as exc:
+            return {
+                "agent": role_id,
+                "name": role_id,
+                "result": {
+                    "summary": f"{role_id} lane crashed but the crew continued.",
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "blocked_prerequisites": ["Lane crashed before producing a normal result."],
+                },
+                "memory": [],
+            }
 
     def _decide_for_role(
         self,

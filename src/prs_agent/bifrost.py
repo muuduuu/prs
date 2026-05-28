@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import socket
 from pathlib import Path
 from typing import Any, Protocol
 import urllib.error
@@ -65,7 +66,10 @@ class BifrostHTTPClient:
             "You are the planning brain for an authorized mobile application "
             "security assessment agent. Return only strict JSON. Choose exactly "
             "one registered tool call or a final answer. Never invent tools. "
-            "Never return shell commands."
+            "Never return shell commands. The only executable tools are the "
+            "JSON objects listed in available_tools. Do not inspect or mention "
+            "MCP servers, launchpad tools, listToolFiles, readToolFile, "
+            "getToolDocs, or executeToolCode."
         )
         return self._decide_with_prompt(
             system_prompt=system_prompt,
@@ -89,7 +93,11 @@ class BifrostHTTPClient:
             f"You are {role_name}, a specialist agent in an authorized mobile application "
             f"security assessment crew. Mission: {mission} Return only strict JSON. "
             "Use only the registered tools provided to your lane. Never invent tools. "
-            "Never return shell commands. Prefer bounded evidence collection. "
+            "Never return shell commands. Do not inspect or mention MCP servers, "
+            "launchpad tools, listToolFiles, readToolFile, getToolDocs, or executeToolCode. "
+            "The available_tools array is PRS's tool registry and those names are callable "
+            "by the orchestrator even if they are not visible as MCP tools to you. "
+            "Prefer bounded evidence collection. "
             "If your lane is complete, blocked, or has no useful next tool, return type=final. "
             "Do not loop on the same failing action."
         )
@@ -134,6 +142,12 @@ class BifrostHTTPClient:
                     },
                 },
             },
+            "hard_rules": [
+                "Return one JSON object only, no markdown and no prose before or after it.",
+                "For tool calls, tool_name must exactly equal one name from available_tools.",
+                "Never call or discuss MCP/tool-discovery helpers such as listToolFiles, readToolFile, getToolDocs, executeToolCode, launchpad, Github, Gmail, Jira, BigQuery, or GCP_Monitoring.",
+                "If prerequisites are missing, return type=final with blocked_prerequisites instead of trying external tool discovery.",
+            ],
         }
         body = {
             "model": self.model_name,
@@ -175,6 +189,18 @@ class BifrostHTTPClient:
                     "findings": [],
                 },
             )
+        except (TimeoutError, socket.timeout) as exc:
+            return BifrostDecision(
+                type="final",
+                thought="Bifrost gateway request timed out.",
+                answer={
+                    "summary": f"Bifrost gateway timed out after {self.timeout_seconds}s.",
+                    "details": str(exc),
+                    "gateway_url": self.gateway_url,
+                    "findings": [],
+                    "blocked_prerequisites": ["Bifrost gateway returned too slowly for this decision step."],
+                },
+            )
         except urllib.error.URLError as exc:
             return BifrostDecision(
                 type="final",
@@ -188,12 +214,27 @@ class BifrostHTTPClient:
 
         content = self._extract_content(payload)
         try:
-            decision = json.loads(content)
+            decision = json.loads(_strip_json_fence(content))
         except json.JSONDecodeError:
             return BifrostDecision(
                 type="final",
                 thought="Bifrost returned non-JSON content.",
                 answer={"summary": content[:1000], "findings": []},
+            )
+
+        available_names = {tool.get("name") for tool in tool_schemas}
+        requested_tool = decision.get("tool_name")
+        if decision.get("type") == "tool_call" and requested_tool not in available_names:
+            return BifrostDecision(
+                type="final",
+                thought="Bifrost requested a tool outside the PRS registry.",
+                answer={
+                    "summary": "Bifrost attempted to call an unregistered tool; lane stopped to avoid tool-environment drift.",
+                    "requested_tool": requested_tool,
+                    "available_tools": sorted(name for name in available_names if isinstance(name, str)),
+                    "findings": [],
+                    "blocked_prerequisites": ["Model must choose from PRS registered tools only."],
+                },
             )
 
         return BifrostDecision(
@@ -210,6 +251,20 @@ class BifrostHTTPClient:
         if "content" in payload:
             return payload["content"]
         return json.dumps(payload)
+
+
+def _strip_json_fence(content: str) -> str:
+    """Accept raw JSON or a fenced JSON block from less obedient gateways."""
+
+    clean = content.strip()
+    if clean.startswith("```"):
+        lines = clean.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        clean = "\n".join(lines).strip()
+    return clean
 
 
 def normalize_chat_url(gateway_url: str) -> str:

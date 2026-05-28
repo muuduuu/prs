@@ -247,6 +247,7 @@ def build_bifrost(payload: dict[str, Any], run_id: str | None = None):
             gateway_url=bifrost_config["gateway_url"],
             api_key=bifrost_config["api_key"],
             model_name=bifrost_config.get("model") or "bifrost",
+            timeout_seconds=int(bifrost_config.get("timeout_seconds") or payload.get("bifrost_timeout_seconds") or 120),
             context_hints=context_hints,
         )
     return AssessmentPlannerClient(
